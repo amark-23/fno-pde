@@ -122,3 +122,39 @@ can get. The value of $\nu$ sets where that balance lands.
 nonlinearity ($u \cdot u_x$) and diffusion ($\nu \cdot u_{xx}$), so it exercises
 the hard parts of a solver — and later, of the FNO — without the full
 complexity of something like Navier–Stokes.
+
+---
+
+## 3. Sampling initial conditions — the Gaussian random field
+
+**What and why.** We need many *different* smooth starting fields u(x, 0) so the
+FNO learns the mapping for a whole distribution of inputs, not one curve. A
+**Gaussian random field (GRF)** lets us draw a random *function* (a random
+curve); any finite set of its values is jointly Gaussian.
+
+**Smoothness = suppressing high frequencies.** We build the field in Fourier
+space (using Concept #1):
+
+1. Give each wavenumber $k$ a **random** complex coefficient (real and imaginary
+   parts drawn from a standard normal).
+2. Multiply by a **scale factor that decays with $k$**:
+
+$$s(k) = \tau^{\alpha - 1} \cdot (\tau^2 + (2\pi k)^2)^{-\alpha/2}$$
+
+3. **Inverse-FFT** back to a real curve, and drop the $k = 0$ mode so the field
+   is centered around zero.
+
+Because high-frequency modes get small amplitudes, the curve comes out smooth.
+
+**The knobs.**
+
+- $\alpha$ — the main **smoothness** dial. Larger $\alpha$ makes $s(k)$ fall off
+  faster as $k$ grows, so high frequencies are crushed harder and the curve is
+  smoother.
+- $\tau$ — a length-scale knob; usually fixed. Sets the overall balance of low-
+  vs high-frequency content.
+
+**Why "Gaussian."** The coefficients are Gaussian, so the field values (linear
+combinations of them) are Gaussian too — the simplest random model, fully
+described by its mean and covariance. The decaying spectrum $s(k)^2$ is just the
+Fourier-space form of that covariance.
