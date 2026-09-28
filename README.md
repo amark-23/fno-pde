@@ -2,7 +2,7 @@
 
 Learning PDE solution operators with **Fourier Neural Operators (FNOs)**, benchmarked against a U-Net and a classical numerical solver.
 
-This repository accompanies a master's-thesis-adjacent portfolio project. The research question:
+The research question:
 
 > How do FNOs compare to a standard CNN baseline and a numerical solver on **accuracy**, **speed**, **data efficiency** and **generalization to unseen grid resolutions**?
 
