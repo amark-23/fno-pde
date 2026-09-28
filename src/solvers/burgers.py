@@ -64,17 +64,60 @@ def gaussian_random_field(n_samples, grid, alpha=2.5, tau=7.0, seed=None):
     return field    
 
 
-
-
-
-
-
-def solve_burgers():
+def solve_burgers(u0, nu=0.01, t_final=1.0, dt=1e-4):
     """March an initial field u0 forward in time to u(x, t_final).
 
     Uses the FFT for the spatial derivatives (u_x, u_xx). The time-stepping
     scheme is the open decision above.
-
-    TODO: build together. (args and body to come)
     """
-    ...
+    n_samples, grid = u0.shape
+
+    # Derivative operators in Fourier space (Concept #1).
+    k  = 2 * np.pi * np.fft.fftfreq(grid, d=1.0 / grid)   # angular wavenumbers
+    ik = 1j * k          # d/dx      -> multiply by ik
+    k2 = k ** 2          # d^2/dx^2  -> multiply by -k^2
+
+    def rhs(u):
+        """Rate of change  F(u) = -u * u_x + nu * u_xx."""
+        u_hat = np.fft.fft(u, axis=-1)                 # to Fourier space
+        u_x  = np.fft.ifft(ik * u_hat, axis=-1).real   # first derivative
+        u_xx = np.fft.ifft(-k2 * u_hat, axis=-1).real  # second derivative
+        return -u * u_x + nu * u_xx    
+    
+    n_steps = int(round(t_final / dt))
+    u = u0.copy()                    # don't overwrite the caller's array
+    for _ in range(n_steps):
+        u = u + dt * rhs(u)          # Euler step: u_next = u_now + dt * F(u)
+    return u
+    
+def solve_burgers_if(u0, nu=0.01, t_final=1.0, dt=1e-3): 
+    """March a field u0 forward in time to u(x, t_final) using robust scheme."""
+    n_samples, grid = u0.shape
+
+    # Wavenumbers and first-derivative operator (as before).
+    m  = np.fft.fftfreq(grid, d=1.0 / grid)   # integer wavenumbers
+    k  = 2 * np.pi * m
+    ik = 1j * k
+
+    # NEW #1: the integrating factor — the exact linear (diffusion) solve.
+    E = np.exp(-nu * k**2 * dt)               # always in (0, 1]; never blows up
+
+    # NEW #2: 2/3 dealiasing mask — keep low 2/3 of modes, zero the top third.
+    dealias = np.abs(m) < grid / 3
+
+    def nonlinear_hat(u):
+        # N = -u * u_x, returned in Fourier space and dealiased.
+        u_hat = np.fft.fft(u, axis=-1)
+        u_x   = np.fft.ifft(ik * u_hat, axis=-1).real
+        N_hat = np.fft.fft(-u * u_x, axis=-1)
+        return N_hat * dealias          # zero the top third of modes
+
+    # Integrating-factor Euler loop.
+    n_steps = int(round(t_final / dt))
+    u = u0.copy()
+    for _ in range(n_steps):
+        u_hat = np.fft.fft(u, axis=-1)
+        u_hat = E * (u_hat + dt * nonlinear_hat(u))   
+        u = np.fft.ifft(u_hat, axis=-1).real
+    return u
+

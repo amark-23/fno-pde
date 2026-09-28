@@ -158,3 +158,88 @@ Because high-frequency modes get small amplitudes, the curve comes out smooth.
 combinations of them) are Gaussian too — the simplest random model, fully
 described by its mean and covariance. The decaying spectrum $s(k)^2$ is just the
 Fourier-space form of that covariance.
+
+---
+
+## 4. Marching forward in time (time-stepping)
+
+**The rate of change.** Rearrange Burgers' to isolate the time derivative:
+
+$$u_t = -u \cdot u_x + \nu \cdot u_{xx}$$
+
+Call the right-hand side $F(u)$ — it tells us how fast $u$ is changing right now.
+
+**The Euler step.** To advance a small step $dt$:
+
+$$u_{\text{next}} = u_{\text{now}} + dt \cdot F(u_{\text{now}})$$
+
+Repeat this many times, from $t = 0$ to $t = t_{\text{final}}$. That is the whole
+solver loop.
+
+**Analogy to optimization.** This is structurally like a gradient-descent step:
+instead of nudging parameters downhill by a gradient with a learning rate, we
+nudge the field forward in time by $F(u)$ with a step size $dt$. And $dt$ behaves
+like a learning rate — **too large and the recursion blows up** (values race off
+to infinity / NaN), too small and it is just slow.
+
+**Stiffness — why $dt$ can be forced tiny.** The diffusion term $\nu \cdot u_{xx}$
+becomes $-\nu (2\pi k)^2 \cdot \hat{u}$ in Fourier space. For high wavenumbers $k$
+that is a large negative number, and an explicit step is only stable when
+
+$$dt \lesssim \frac{1}{\nu \cdot k_{\max}^2}$$
+
+Since $k_{\max}$ grows with the grid size, high-resolution grids force very small
+steps. This is called **stiffness**.
+
+**Two schemes.**
+
+- **Explicit** (simple): just use a small-enough $dt$. Easy to write and
+  understand; the cost is many small steps.
+- **Stiff-aware / robust**: treat the linear diffusion term *exactly* in Fourier
+  space, which removes the stability limit and allows much larger $dt$. A little
+  more theory and code.
+
+**Our choice.** Start with the **explicit** scheme to learn the mechanics and
+watch a shock form (and, on purpose, watch it blow up when $dt$ is too big).
+Then upgrade to the **robust** scheme, because one of our experiments
+(resolution transfer) needs ground-truth data at grid 1024, where the explicit
+$dt$ limit would otherwise make data generation painfully slow.
+
+---
+
+## 5. The robust stepper — integrating factor + dealiasing
+
+**Problem recap.** The explicit scheme's $dt$ was limited by the *stiff* linear
+term $-\nu k^2 \hat{u}$: for high $k$ it is huge, forcing tiny steps. The
+nonlinear term was never the bottleneck.
+
+**Split each Fourier mode into linear + nonlinear.**
+
+$$\frac{d\hat{u}}{dt} = \underbrace{-\nu k^2 \hat{u}}_{\text{linear, stiff}} + \underbrace{\hat{N}}_{\text{nonlinear, mild}}, \qquad \hat{N} = \text{FFT}(-u \cdot u_x)$$
+
+**Solve the linear part exactly.** On its own, $d\hat{u}/dt = -\nu k^2 \hat{u}$
+has the closed form $\hat{u}(t+dt) = e^{-\nu k^2 dt} \cdot \hat{u}(t)$. That
+factor is **always in $(0, 1]$**: it equals 1 at $k = 0$ and $\to 0$ as
+$k \to \infty$. Because it is never above 1, multiplying by it can only shrink a
+mode — it can **never blow up**, for any $k$ or $dt$. (Contrast the explicit
+scheme, which multiplied a mode by $(1 - \nu k^2 dt)$; for large $k \cdot dt$
+that exceeds 1 in magnitude and amplifies the mode → explosion.)
+
+**Integrating-factor update.** Treat the stiff linear part with its exact
+exponential; step only the mild nonlinear part explicitly:
+
+$$\hat{u}_{\text{next}} = e^{-\nu k^2 dt} \cdot \left( \hat{u}_{\text{now}} + dt \cdot \hat{N}_{\text{now}} \right)$$
+
+The stiff stability limit is gone; only the mild advective step-size limit from
+the nonlinear term remains, so $dt$ can be much larger.
+
+**Dealiasing (the 2/3 rule).** The product $u \cdot u_x$ creates frequencies
+higher than the grid can represent; they fold back as false low-frequency noise
+("aliasing") that can corrupt or destabilize the solution. Fix: zero out the top
+third of wavenumbers in the nonlinear term before using it. Cheap, and it
+removes the aliasing.
+
+**Result.** Integrating factor (tames stiffness) + 2/3 dealiasing (tames the
+product) → a solver that stays stable at large $dt$ and high resolution, so
+grid-1024 data generation is fast. We keep the explicit `solve_burgers` for
+comparison and add this as `solve_burgers_if`.
