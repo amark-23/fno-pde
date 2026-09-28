@@ -243,3 +243,39 @@ removes the aliasing.
 product) → a solver that stays stable at large $dt$ and high resolution, so
 grid-1024 data generation is fast. We keep the explicit `solve_burgers` for
 comparison and add this as `solve_burgers_if`.
+
+---
+
+## 6. Verifying the solver — the convergence check
+
+**The problem.** We treat the solver's output as the true $u(x, 1)$, but every
+time-stepper carries an error that depends on $dt$ (for our first-order scheme,
+error $\propto dt$). We have no exact solution to compare against.
+
+**The test: self-consistency.** Instead of comparing to truth, check whether the
+answer *stops changing* as $dt$ shrinks. Solve at $dt, dt/2, dt/4, \dots$, take
+the finest as a reference, and measure the relative L2 error of the coarser runs
+against it. If refining $dt$ barely changes the result, the time error is already
+negligible and the solver is converged — trustworthy as ground truth.
+
+**Result (our IF solver, grid 256, $\nu = 0.01$).**
+
+| $dt$ | rel-L2 vs finest | change when $dt$ halved |
+| --- | --- | --- |
+| 2.0e-3 | 2.2e-3 | 1.2e-3 |
+| 1.0e-3 | 1.0e-3 | 5.9e-4 |
+| 5.0e-4 | 4.4e-4 | 2.9e-4 |
+| 2.5e-4 | 1.5e-4 | 1.5e-4 |
+
+At our working $dt = 10^{-3}$, halving the step changes the answer by only
+$\approx 6 \times 10^{-4}$ (0.06%) — the "halving barely changes it" criterion is
+met.
+
+**Two things this confirms.**
+
+1. **Converged** — the error is tiny at our working $dt$, so the data is
+   trustworthy.
+2. **Correct order** — each halving of $dt$ roughly halves the error, the
+   signature of a first-order scheme (a straight line of slope $\approx 1$ on a
+   log-log plot). Erratic or stalled error would instead hint at a bug, so this
+   clean trend is also a sanity check on the implementation.

@@ -5,7 +5,7 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-REPO = os.path.abspath(os.path.join(HERE, "..", ".."))
+REPO = os.path.abspath(os.path.join(HERE, "..", "..", ".."))
 spec = importlib.util.spec_from_file_location("burgers", os.path.join(REPO, "src", "solvers", "burgers.py"))
 b = importlib.util.module_from_spec(spec); spec.loader.exec_module(b)
 
@@ -33,5 +33,5 @@ plt.xlabel("dt"); plt.ylabel("rel-L2 error vs finest dt")
 plt.title("Convergence of solve_burgers_if\n(error shrinks as dt decreases)")
 plt.grid(True, which="both", alpha=0.3)
 plt.tight_layout()
-plt.savefig(os.path.join(HERE, "convergence.png"), dpi=110)
+plt.savefig(os.path.join(HERE, "..", "figures", "convergence.png"), dpi=110)
 print("saved convergence.png")
