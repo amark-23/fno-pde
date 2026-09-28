@@ -121,3 +121,62 @@ def solve_burgers_if(u0, nu=0.01, t_final=1.0, dt=1e-3):
         u = np.fft.ifft(u_hat, axis=-1).real
     return u
 
+def downsample(u, target_grid):
+    """Spectrally downsample the last axis to target_grid points.
+
+    FFT -> keep the lowest wavenumbers the coarse grid supports -> inverse FFT.
+    Nearly lossless for smooth fields, whose energy lives in the low modes.
+    """
+    grid = u.shape[-1]
+    if target_grid == grid:
+        return u
+    if target_grid > grid:
+        raise ValueError("downsample only reduces resolution")
+
+    u_hat = np.fft.rfft(u, axis=-1)                          # real FFT: freqs 0..grid/2
+    keep  = target_grid // 2 + 1                             # modes the coarse grid holds
+    u_hat_small = u_hat[..., :keep] * (target_grid / grid)   # truncate high modes + rescale
+    return np.fft.irfft(u_hat_small, n=target_grid, axis=-1)
+
+def generate_dataset(n_train=1000, n_test=200, base_grid=256, nu=0.01,
+                     t_final=1.0, dt=1e-3, resolutions=(64, 128, 256), seed=0):
+    """Generate (u0 -> uT) pairs at base_grid, plus downsampled copies.
+
+    Returns a dict of arrays keyed by split and resolution, e.g.
+    'u0_train_64', 'uT_test_256' — ready to save with np.savez.
+    """
+    n = n_train + n_test
+
+    # 1. Sample all initial conditions at the base resolution.
+    u0 = gaussian_random_field(n, base_grid, seed=seed)
+
+    # 2. Solve every one forward to u(x, t_final), batched in one call.
+    uT = solve_burgers_if(u0, nu=nu, t_final=t_final, dt=dt)
+
+    # 3. For each resolution: downsample, then split train / test.
+    data = {}
+    for res in resolutions:
+        u0_r = downsample(u0, res)
+        uT_r = downsample(uT, res)
+        data[f"u0_train_{res}"] = u0_r[:n_train].astype(np.float32)
+        data[f"uT_train_{res}"] = uT_r[:n_train].astype(np.float32)
+        data[f"u0_test_{res}"]  = u0_r[n_train:].astype(np.float32)
+        data[f"uT_test_{res}"]  = uT_r[n_train:].astype(np.float32)
+    return data
+
+
+
+
+
+def main():
+    import os
+    os.makedirs("data", exist_ok=True)
+    data = generate_dataset()
+    np.savez_compressed("data/burgers.npz", **data)
+    print(f"Saved data/burgers.npz with {len(data)} arrays:")
+    for key, arr in data.items():
+        print(f"  {key:16s} {arr.shape}")
+
+
+if __name__ == "__main__":
+    main()

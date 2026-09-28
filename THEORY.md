@@ -279,3 +279,24 @@ met.
    signature of a first-order scheme (a straight line of slope $\approx 1$ on a
    log-log plot). Erratic or stalled error would instead hint at a bug, so this
    clean trend is also a sanity check on the implementation.
+
+---
+
+## 7. Downsampling — the same solution at several resolutions
+
+**Why we need it.** The FNO's headline property is that it is
+*resolution-invariant*: one trained model can run on any grid size. The
+resolution-transfer experiment tests this by training at a coarse grid (e.g. 64)
+and evaluating at finer ones (128, 256, 1024). To make that comparison fair, we
+need the **same** solutions represented at each resolution. So we generate the
+data once at a high base resolution, then downsample $u_0$ and $u_T$ to the
+coarser grids — the coarse versions are exact restrictions of the same fields,
+not separately generated ones.
+
+**How — spectral (Fourier) downsampling.** Naively keeping every $k$-th grid
+point can alias and distort. Instead: FFT the field, **keep only the lowest
+wavenumbers the coarse grid can represent** (up to its Nyquist limit), and
+inverse-FFT at the smaller size. Because a smooth field's energy lives in its low
+modes, dropping the high ones is nearly lossless — this is the natural way to
+represent a band-limited function on fewer points. A scale factor
+(target / source) corrects the FFT normalization so amplitudes are preserved.
