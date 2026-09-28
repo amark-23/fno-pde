@@ -1,0 +1,19 @@
+# Data and generated artifacts
+data/
+results/*.csv
+results/*.png
+results/*.gif
+*.npz
+*.pt
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.ipynb_checkpoints/
+
+# OS / editor
+.DS_Store
+.vscode/
+.idea/
