@@ -16,7 +16,7 @@ A Fourier Neural Operator learns a map between *functions* rather than between f
 
 The retained-mode spectral update, per Fourier mode k below a cutoff:
 
-$ (\mathcal{K}v)(x) = \mathcal{F}^{-1}\!\big(R \cdot \mathcal{F}(v)\big)(x) $
+$$(\mathcal{K}v)(x) = \mathcal{F}^{-1}\big(R \cdot \mathcal{F}(v)\big)(x)$$
 
 where F is the (discrete) Fourier transform and R are the learned per-mode weights.
 
