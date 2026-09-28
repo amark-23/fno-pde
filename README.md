@@ -8,7 +8,7 @@ The research question:
 
 Two PDEs are covered: the 1D viscous Burgers' equation (data generated here from a spectral solver) and 2D incompressible Navier–Stokes in vorticity form (external dataset).
 
-> **Status:** scaffold with working starter code. Results and figures are filled in as the experiments are run — see the [project plan](https://claude.ai/code/artifact/a9639750-549a-4871-90c2-9ec5c3094042).
+> **Status:** scaffold with working starter code. Results and figures are filled in as the experiments are run
 
 ## Method in one paragraph
 
