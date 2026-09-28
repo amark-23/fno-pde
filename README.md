@@ -10,7 +10,7 @@ Two PDEs are covered: the 1D viscous Burgers' equation (data generated here from
 
 > **Status:** scaffold with working starter code. Results and figures are filled in as the experiments are run
 
-## Method in one paragraph
+## FNO
 
 A Fourier Neural Operator learns a map between *functions* rather than between fixed-size vectors. Its core layer is a **spectral convolution**: transform the input to Fourier space, keep the lowest few modes, multiply them by learned complex weights, and transform back. Because the weights act on frequencies rather than grid points, a model trained on a coarse grid can be evaluated on a finer one — the property this project tests directly.
 
