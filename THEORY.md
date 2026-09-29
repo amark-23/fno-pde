@@ -454,3 +454,67 @@ baseline rather than a fundamental limit.
 Only after these steps was the comparison run. The lesson is that a negative
 result is only as strong as the effort invested in the losing side, and a baseline
 must be genuinely good before its loss carries any meaning.
+
+---
+
+# Part 2: 2D Navier-Stokes
+
+## 13. The vorticity-streamfunction formulation
+
+Part 2 applies the same solver-to-FNO pipeline to the 2D incompressible
+Navier-Stokes equations. Most of the numerical machinery carries over unchanged;
+the new element is how the equations are written.
+
+The raw equations evolve a velocity field $\mathbf{u} = (u, v)$ and a pressure
+$p$, subject to incompressibility $\nabla \cdot \mathbf{u} = 0$. The pressure is
+awkward: it has no evolution equation of its own and exists only to enforce
+incompressibility, so carrying it through every step is inconvenient. The
+standard remedy is to reformulate in terms of vorticity.
+
+In two dimensions the vorticity is a single scalar, the local rotation of the
+fluid:
+
+$$\omega = \partial_x v - \partial_y u$$
+
+Taking the curl of the momentum equation removes the pressure entirely, because
+the curl of a gradient is zero and the pressure enters only as $\nabla p$. This
+is an exact reformulation, not an approximation; no physics is discarded. What
+remains is a single transport equation for the vorticity:
+
+$$\partial_t \omega + \mathbf{u} \cdot \nabla \omega = \nu \Delta \omega + f$$
+
+The terms are familiar from Part 1. The term $\partial_t \omega$ is the quantity
+stepped forward. The term $\mathbf{u} \cdot \nabla \omega$ is nonlinear
+advection, the two-dimensional counterpart of the $u \cdot u_x$ term in Burgers,
+with the vorticity carried along by the flow. The term $\nu \Delta \omega$ is
+viscous diffusion, handled by the same integrating factor as in Concept 5. The
+term $f$ is an external forcing that sustains the flow.
+
+The one genuinely new mechanism is recovering the velocity from the vorticity,
+which the advection term requires. The link is the streamfunction $\psi$, defined
+so that the velocity is automatically divergence-free:
+
+$$u = \partial_y \psi, \qquad v = -\partial_x \psi$$
+
+and $\psi$ relates to $\omega$ through a Poisson equation:
+
+$$\omega = -\Delta \psi$$
+
+This is where the spectral method pays off again. The Laplacian is multiplication
+by $-k^2$ in Fourier space (Concept 1), so the Poisson equation becomes a single
+division per mode:
+
+$$\hat\psi = \hat\omega / k^2$$
+
+with the $k = 0$ mode set to zero. A differential equation that is expensive in
+physical space is one division in Fourier space. The velocity components then
+follow from $\psi$ by multiplication with $ik$, and the advection term is formed
+pseudo-spectrally, exactly as the nonlinear term in Burgers.
+
+Each solver step therefore proceeds as follows. Given the vorticity, solve the
+Poisson equation for the streamfunction by dividing by $k^2$; obtain the velocity
+components from the streamfunction by multiplying by $ik$; form the advection
+term pseudo-spectrally; add the forcing; and advance in time with the integrating
+factor for the viscous term and the two-thirds dealiasing for the nonlinear
+product. Every piece is either reused from Part 1 or a single Fourier-space
+operation.
