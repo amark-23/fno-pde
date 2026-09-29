@@ -175,6 +175,4 @@ runs all four experiments.
 - Li et al., *Fourier Neural Operator for Parametric PDEs*, ICLR 2021. [arXiv:2010.08895](https://arxiv.org/abs/2010.08895)
 - Kovachki et al., *Neural Operator: Learning Maps Between Function Spaces*, JMLR 2023. [arXiv:2108.08481](https://arxiv.org/abs/2108.08481)
 
-## License
 
-MIT, see [LICENSE](LICENSE).
