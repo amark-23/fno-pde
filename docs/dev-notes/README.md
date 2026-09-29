@@ -72,3 +72,9 @@ autoregressive rollout; the FNO stays stable and overtakes it by step three.
 One test solution marched from its smooth initial condition to a shock over
 t = 0 to 1, using the same integrator that generated the dataset. It shows the
 single-step map the FNO learns. Regenerate with `python experiments/run_animation_1d.py`.
+
+## 13. 2D rollout (animation)
+![NS rollout animation](figures/ns_rollout.gif)
+
+The trained FNO rolled out autoregressively for 19 steps against the true
+vorticity and the pointwise error. Produced by section 6b of the training notebook.

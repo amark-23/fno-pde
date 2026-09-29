@@ -8,8 +8,8 @@ one idea, in the order the code introduces it.
 
 ## Overview
 
-Two distinct systems appear in this project, and because the FFT is used in both
-they are easily confused. They must be kept separate.
+The project involves two distinct systems, both built on the FFT: a numerical
+solver and the FNO.
 
 The first is the solver: classical physics, with no machine learning. It computes
 the true final field u(x, 1) from an initial field u(x, 0) by marching forward
@@ -33,14 +33,7 @@ operator learning. Once trained, the network is far faster than the solver and
 generalizes to grid resolutions never seen during training, which places the work
 within scientific machine learning.
 
-Two summaries are worth keeping in mind. On the relationship between the systems,
-the solver computes u(x, 1) to near-exact accuracy while the FNO approximates
-that mapping with a fast learned shortcut, and the experiments measure how close
-the approximation is. On what the solver does, it marches u(x, 0) forward through
-many small time steps to reach u(x, 1), using the FFT at each step to compute the
-spatial derivatives it needs, so that time-stepping advances the solution and the
-FFT makes each step accurate and inexpensive. Backpropagation occurs only in the
-FNO; the solver never computes a gradient.
+Backpropagation occurs only in the FNO; the solver never computes a gradient.
 
 ---
 

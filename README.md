@@ -111,6 +111,15 @@ but its error compounds, and the FNO overtakes it by step 3), and it runs about
 27x faster than the numerical solver. The honest conclusion: the U-Net is a better
 one-step turbulence predictor, but the FNO is the better operator.
 
+**The rollout, animated.** The single trained FNO applied autoregressively over 19
+steps, shown against the true vorticity and the pointwise error. Truth and
+prediction stay visually identical while the error stays faint, which is the
+rollout stability the table reports.
+
+![NS rollout animation](docs/dev-notes/figures/ns_rollout.gif)
+
+*Truth, FNO prediction, and |error| across the 19-step rollout.*
+
 ## Repo layout
 
 ```
