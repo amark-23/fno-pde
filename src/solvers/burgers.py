@@ -22,18 +22,6 @@ Pseudo-spectral in space: use the FFT to compute the spatial derivatives
 u_x and u_xx (Concept #1 in THEORY.md -> derivative = multiply by ik).
 Then march forward in time in many small steps dt, from t = 0 to t = t_final.
 
-PLAN — functions we'll build, in order
---------------------------------------
-1. gaussian_random_field(...)   sample smooth, random initial conditions u(x, 0)
-2. solve_burgers(...)           march one u0 forward in time to u(x, t_final)
-3. (later) downsample(...)      make coarser-grid copies (for resolution tests)
-4. (later) generate_dataset()   + main(): produce and save many (u0, uT) pairs
-
-OPEN DECISION (before we write solve_burgers)
----------------------------------------------
-How to step forward in time. Options range from a simple explicit scheme to a
-"stiff-aware" one that handles the nu * u_xx term more robustly. We'll pick this
-together and note the reasoning in THEORY.md.
 """
 
 import numpy as np
