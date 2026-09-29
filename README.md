@@ -125,7 +125,7 @@ rollout stability the table reports.
 ```
 fno-pde/
 ├── README.md
-├── THEORY.md                  # theoretical background, concept by concept
+├── THEORY.md                           # theoretical background, concept by concept
 ├── requirements.txt
 ├── src/
 │   ├── solvers/burgers.py              # 1D Burgers solver + dataset
