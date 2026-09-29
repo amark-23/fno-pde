@@ -5,7 +5,7 @@ from scratch, benchmarked against a strong U-Net baseline and a classical
 numerical solver.
 
 The project is in two parts. **Part 1 (complete)** covers the 1D viscous Burgers'
-equation. **Part 2 (in progress)** extends the same machinery to 2D incompressible
+equation. **Part 2 (complete)** extends the same machinery to 2D incompressible
 Navier-Stokes.
 
 **Research question:** How does an FNO compare to a standard convolutional
@@ -65,22 +65,32 @@ comparable. The U-Net baseline was deliberately strengthened (GroupNorm and
 residual blocks) until it was a genuinely fair comparison; see
 [THEORY.md, section 12](THEORY.md) for that process.
 
-## Part 2: 2D Navier-Stokes (in progress)
+## Part 2: 2D Navier-Stokes (complete)
 
-Extends the same solver-to-FNO pipeline to 2D incompressible Navier-Stokes in
-vorticity form, run on a GPU (Colab / Kaggle). The planned experiments mirror
-Part 1: accuracy against a 2D U-Net baseline, resolution transfer, data
-efficiency, and inference speed against a numerical solver, plus an autoregressive
-rollout that tests stability over many time steps.
+The same solver-to-FNO pipeline applied to 2D incompressible Navier-Stokes in
+vorticity form, generated and trained on a GPU. The vorticity is turbulent and
+high-frequency, a harder and qualitatively different regime from Burgers'.
+Single-step task (predict omega(t+1) from omega(t)), 64x64 grid, 1000 trajectories.
 
-_Results to come._
-
-| Experiment | FNO | U-Net | Notes |
+| Experiment | FNO | U-Net | Winner |
 | --- | --- | --- | --- |
-| Accuracy | _TBD_ | _TBD_ | |
-| Resolution transfer | _TBD_ | _TBD_ | |
-| Rollout stability | _TBD_ | _TBD_ | multi-step |
-| Inference speed | _TBD_ | _TBD_ | vs numerical solver |
+| Accuracy (single-step, rel. L2) | 4.8% | **3.3%** | U-Net |
+| Resolution transfer (32 / 64 / 128) | **3.9 / 4.8 / 4.3%** | 28 / 3.3 / 15% | FNO |
+| Rollout stability (19 steps) | **stable, ~9-15%** | diverges to 25% | FNO |
+| Inference speed | **15.8 ms/step** | n/a | vs solver 427 ms, **27x faster** |
+
+![NS resolution transfer](docs/dev-notes/figures/ns_resolution_transfer.png)
+![NS rollout](docs/dev-notes/figures/ns_rollout.png)
+
+**Findings.** Unlike Burgers', a U-Net is the stronger *single-step, fixed-grid*
+predictor here: its multiscale convolutions capture turbulent high-frequency
+detail better than the FNO's low-mode spectral path. But the FNO wins on the
+properties that make a learned operator useful. It is resolution-invariant (flat
+error across 32/64/128, while the U-Net collapses off its training grid), it stays
+stable under long autoregressive rollouts (the U-Net is more accurate at step 1
+but its error compounds, and the FNO overtakes it by step 3), and it runs about
+27x faster than the numerical solver. The honest conclusion: the U-Net is a better
+one-step turbulence predictor, but the FNO is the better operator.
 
 ## Repo layout
 
@@ -90,16 +100,20 @@ fno-pde/
 ├── THEORY.md                  # theoretical background, concept by concept
 ├── requirements.txt
 ├── src/
-│   ├── solvers/burgers.py     # 1D spectral Burgers' solver + dataset generation
-│   ├── models/fno.py          # FNO1d (SpectralConv1d + FNO1d), from scratch
-│   ├── models/unet.py         # U-Net baseline (GroupNorm + residual, configurable depth)
-│   ├── data.py                # loaders, coordinate channel, normalization
-│   ├── train.py               # config-driven training loop
-│   ├── metrics.py             # relative L2 loss
-│   #  2D Navier-Stokes solver / models are added in Part 2
-├── configs/                   # burgers_fno.yaml, burgers_unet.yaml (+ navier_stokes_* in Part 2)
-├── experiments/               # run_*.py for the experiments + figures/
-└── results/                   # metrics.csv
+│   ├── solvers/burgers.py            # 1D Burgers solver + dataset
+│   ├── solvers/navier_stokes.py      # 2D NS solver (NumPy reference)
+│   ├── solvers/navier_stokes_torch.py  # 2D NS solver (PyTorch, GPU)
+│   ├── models/fno.py                 # FNO1d, FNO2d (+ SpectralConv1d/2d)
+│   ├── models/unet.py                # UNet1d, UNet2d (GroupNorm + residual)
+│   ├── data.py, data_ns.py           # 1D and 2D data loaders
+│   ├── train.py                      # config-driven 1D training
+│   ├── metrics.py                    # relative L2 loss
+│   └── experiments_ns.py             # 2D downsample + rollout helpers
+├── configs/                          # burgers_*.yaml
+├── experiments/                      # Part 1 run_*.py + figures/
+├── notebooks/                        # Part 2 Colab notebooks (GPU)
+├── docs/                             # CODE_MAP.md + dev-notes/
+└── results/                          # metrics.csv
 ```
 
 ## Reproduce (Part 1)
@@ -125,6 +139,10 @@ python experiments/run_speed.py
 Part 1 runs on CPU in minutes, with no GPU needed. On Windows use `py` in place
 of `python`.
 
+**Part 2** runs on a GPU: open `notebooks/navier_stokes_train_colab.ipynb` in
+Colab (T4 GPU) and Run all. It generates the dataset, trains both models, and
+runs all four experiments.
+
 ## References
 
 - Li et al., *Fourier Neural Operator for Parametric PDEs*, ICLR 2021. [arXiv:2010.08895](https://arxiv.org/abs/2010.08895)
@@ -137,4 +155,4 @@ MIT, see [LICENSE](LICENSE).
 ## Roadmap
 
 - [x] Part 1: 1D Burgers' equation (solver, FNO, U-Net baseline, four experiments)
-- [ ] Part 2: 2D incompressible Navier-Stokes (vorticity form) on GPU
+- [x] Part 2: 2D incompressible Navier-Stokes (vorticity form) on GPU

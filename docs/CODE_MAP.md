@@ -56,3 +56,29 @@ Config-driven training.
 - `run_data_efficiency.py` is Experiment 3, error against training-set size.
 - `run_speed.py` is Experiment 4, FNO inference against the numerical solver.
 - `figures/` holds the output figures used in the README.
+
+## Part 2: 2D Navier-Stokes
+
+### src/solvers/navier_stokes.py
+2D Navier-Stokes solver, NumPy reference, vorticity-streamfunction form.
+- `spectral_grid(N)` builds the 2D wavenumbers and dealias mask.
+- `vorticity_to_velocity(...)` does the Poisson solve and streamfunction step.
+- `rhs(...)` forms the advection term plus forcing in Fourier space.
+- `solve_ns(...)` steps forward with the integrating factor, saving snapshots.
+- `gaussian_random_field_2d(...)` and `generate_dataset(...)` build trajectories.
+
+### src/solvers/navier_stokes_torch.py
+A faithful PyTorch/GPU port of the above, used for dataset generation at scale.
+
+### src/data_ns.py
+2D data loading: `single_step_pairs`, `add_coords`, `Normalizer`, `load_ns`,
+`make_loader`.
+
+### src/experiments_ns.py
+`downsample_2d` (spectral downsampling) and `rollout` (autoregressive prediction)
+for the 2D experiments.
+
+### 2D additions to existing files
+- `src/models/fno.py` also defines `SpectralConv2d` and `FNO2d`.
+- `src/models/unet.py` also defines `ResBlock2d` and `UNet2d`.
+- `notebooks/` holds the Colab notebooks for GPU generation and training.

@@ -47,3 +47,21 @@ Five (input u0, target uT) pairs from the generated dataset.
 ![Prediction](figures/prediction_vs_truth.png)
 
 The trained FNO's prediction lies on top of the solver's ground truth.
+
+## 9. 2D Navier-Stokes: forced turbulence
+![NS evolution](figures/ns_evolution.png)
+
+Vorticity from the 2D solver evolving into turbulent filaments. The recovered
+velocity is divergence-free to machine precision.
+
+## 10. 2D resolution transfer
+![NS resolution transfer](figures/ns_resolution_transfer.png)
+
+Trained at grid 64. The FNO error stays flat across 32, 64, and 128, while the
+U-Net collapses off its training grid.
+
+## 11. 2D rollout stability
+![NS rollout](figures/ns_rollout.png)
+
+The U-Net predicts one step more accurately but its error compounds over an
+autoregressive rollout; the FNO stays stable and overtakes it by step three.
