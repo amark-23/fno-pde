@@ -65,3 +65,10 @@ U-Net collapses off its training grid.
 
 The U-Net predicts one step more accurately but its error compounds over an
 autoregressive rollout; the FNO stays stable and overtakes it by step three.
+
+## 12. 1D Burgers' evolution (animation)
+![Burgers' evolution](figures/burgers_evolution.gif)
+
+One test solution marched from its smooth initial condition to a shock over
+t = 0 to 1, using the same integrator that generated the dataset. It shows the
+single-step map the FNO learns. Regenerate with `python experiments/run_animation_1d.py`.

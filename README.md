@@ -65,6 +65,13 @@ comparable. The U-Net baseline was deliberately strengthened (GroupNorm and
 residual blocks) until it was a genuinely fair comparison; see
 [THEORY.md, section 12](THEORY.md) for that process.
 
+**The learned map.** The animation below shows one test solution evolving from
+its smooth initial condition (dashed) into a shock across t = 0 to 1. The FNO
+learns to reproduce the last frame directly from the first in a single forward
+pass, skipping every intermediate solver step.
+
+![Burgers' evolution](docs/dev-notes/figures/burgers_evolution.gif)
+
 ## Part 2: 2D Navier-Stokes (complete)
 
 The same solver-to-FNO pipeline applied to 2D incompressible Navier-Stokes in
