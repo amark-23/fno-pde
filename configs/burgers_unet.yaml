@@ -1,0 +1,16 @@
+# U-Net baseline on 1D Burgers', grid 256. 3-level GroupNorm+residual U-Net
+# (~429k params, modestly above the FNO's 287k) -- a fair, well-optimized baseline.
+data: data/burgers.npz
+grid: 256
+n_train: 1000
+n_test: 200
+model: unet
+n_levels: 3
+width: 24
+epochs: 250
+batch_size: 32
+lr: 1.0e-3
+weight_decay: 1.0e-4
+seed: 0
+lr_step: 100
+lr_gamma: 0.5

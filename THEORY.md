@@ -300,3 +300,122 @@ inverse-FFT at the smaller size. Because a smooth field's energy lives in its lo
 modes, dropping the high ones is nearly lossless — this is the natural way to
 represent a band-limited function on fewer points. A scale factor
 (target / source) corrects the FFT normalization so amplitudes are preserved.
+
+---
+
+## 8. The spectral convolution — the heart of the FNO
+
+**The move.** Same FFT hop as the solver (Concept #1), but the multiplier is
+**learned** instead of the fixed $ik$:
+
+1. FFT the input field to Fourier space.
+2. Keep only the lowest `modes` coefficients; discard the high ones.
+3. Multiply each kept coefficient by a **learned complex weight**.
+4. Inverse-FFT back to a field.
+
+$$(\mathcal{K}v)(x) = \mathcal{F}^{-1}\big(R \cdot \mathcal{F}(v)\big)(x)$$
+
+where $R$ are the learned per-mode weights (a small complex tensor).
+
+**What is actually learned.** Not a kernel in physical space — we parametrize
+the filter *directly by its Fourier coefficients* $R$ (a handful of complex
+numbers). The FFT does not "discover" a kernel; it just carries the signal into
+and out of the space where the parameters live. By the convolution theorem, a
+multiply in Fourier space equals a convolution in physical space, so $R$
+implicitly defines a **global** convolution filter — one spanning the whole
+domain, unlike a CNN's small local kernel. That global reach is why the FNO
+captures long-range structure cheaply.
+
+**Why keep only low modes.**
+
+- *Regularization / efficiency.* The solution's important structure lives in the
+  low frequencies (same intuition as the GRF and downsampling), so learning
+  weights for just those is enough and generalizes better.
+- *Resolution independence.* "The lowest 16 modes" means the same physical
+  frequencies (0, 1, ..., 15 cycles across the domain) on any grid — a grid of
+  64 or 1024 both contain them. So a layer that learns 16 complex weights plugs
+  into any resolution unchanged. This is the crux of the resolution-transfer
+  property.
+
+**Contrast with the solver.** Solver: FFT → multiply by fixed $ik$ → iFFT (a
+known derivative). FNO: FFT → multiply by learned $R$ → iFFT (a learned
+operator). Same machinery; fixed vs trainable multiplier.
+
+---
+
+## 9. The full FNO architecture
+
+The spectral conv (Concept #8) is the core piece; the model wraps it in a
+standard lift -> process -> project structure.
+
+**Pipeline.** Input $u(x, 0)$, shape (batch, grid, in_channels):
+
+1. **Lift** — a `Linear` layer raises `in_channels` to a wider hidden dimension
+   `width` (e.g. 64), giving the network room to represent features. Input has
+   `in_channels = 2`: the field plus its x-coordinate (feeding the grid
+   coordinate in is a small standard trick that helps the model).
+2. **Fourier layers** ($\times$ depth, e.g. 4) — each runs **two paths in
+   parallel and adds them**, then applies a GELU nonlinearity:
+   - *Spectral conv* — global, but low-frequency only (it keeps only the low
+     modes).
+   - *Pointwise 1x1 conv* — local (acts at each grid point independently), but
+     carries **all** frequencies, including the high ones the spectral path
+     discarded.
+
+   $$x \leftarrow \text{GELU}\big(\text{SpectralConv}(x) + W x\big)$$
+
+3. **Project** — two `Linear` layers bring `width` down to `out_channels` (the
+   predicted field), with a GELU between.
+
+Output: predicted $u(x, 1)$, shape (batch, grid, out_channels).
+
+**Why both paths.** The spectral conv is global but drops high modes; the 1x1
+conv is local but keeps them. Added together they cover both **global
+low-frequency structure** and **local high-frequency detail** — neither alone is
+enough. This matters for shocks especially, which are sharp (high-frequency)
+features the spectral path throws away and the local path preserves.
+
+**Why the nonlinearity.** Without the GELU, stacking layers would collapse to a
+single linear operator. The nonlinearity between layers is what lets the model
+represent a nonlinear solution operator (Burgers' is nonlinear).
+
+**Implementation note.** `Linear` layers expect channels last
+(batch, grid, width); the conv-style layers expect channels in the middle
+(batch, width, grid). The forward pass permutes between the two conventions —
+bookkeeping, not math.
+
+---
+
+## 10. Training the FNO
+
+Standard supervised learning — the FNO (student) learns to imitate the solver
+(teacher). A few choices are specific to operator learning.
+
+**The supervised setup.**
+
+- Input $X = [u_0, x\text{-coordinate}]$ (2 channels); target $y = u_T$.
+- Loss = **relative L2** (below); optimizer = Adam with weight decay; a cosine
+  learning-rate schedule; batches via a `DataLoader`.
+
+**Relative L2 loss.** Per sample $\lVert \text{pred} - \text{target}\rVert /
+\lVert \text{target}\rVert$, then averaged over the batch.
+
+- *Why not plain MSE.* Relative L2 normalizes each sample by its own magnitude,
+  so large- and small-amplitude fields contribute equally; MSE would let
+  large-magnitude samples dominate.
+- *Scale-invariance.* Comparable across samples, resolutions and datasets — the
+  standard FNO metric, and the same one used to verify the solver (Concept #6).
+
+**Normalization.** Standardize the field channel (and the targets) to zero mean
+/ unit variance using **training** statistics, so the optimizer sees well-scaled
+inputs. Predictions are **decoded** back to physical units before the error is
+measured, so the reported number matches the solver's real output.
+
+**Result (grid 256, 1000 train, 100 epochs).** Test relative L2 $\approx 1.6
+\times 10^{-3}$ (about 0.16%) — the FNO reproduces the solver to a fraction of a
+percent, matching the original FNO paper's Burgers' result. Random weights would
+give $\approx 1.0$ (100% error).
+
+**Config-driven.** All settings (grid, modes, width, depth, epochs, lr, training
+size) live in a YAML config, so the upcoming experiments — baseline comparison,
+resolution transfer, data efficiency — are just different configs, not new code.

@@ -1,0 +1,117 @@
+"""
+Fourier Neural Operator (FNO) — 1D.
+
+PURPOSE
+-------
+A neural network that learns the solution operator of Burgers': map an initial field u(x, 0) directly to u(x, 1),
+in one shot, imitating the solver. Trained by backpropagation.
+
+THE KEY IDEA (reuses THEORY.md #1)
+----------------------------------
+The solver used the FFT to apply a FIXED operator (multiply by ik) in Fourier
+space. The FNO uses the same FFT hop, but multiplies by LEARNED weights instead.
+That trainable Fourier-space multiply is the "spectral convolution" — the heart
+of the model. Because it acts on frequencies (not grid points), one trained
+model can run at any resolution.
+
+ARCHITECTURE (what we'll build, in order)
+-----------------------------------------
+Input u(x,0), shape (batch, grid, in_channels)
+  |
+  1. Lift:      a Linear layer raises in_channels -> width (a richer hidden dim)
+  |
+  2. Fourier layers x depth: each does
+         spectral_conv(x)  +  pointwise_linear(x)   then a GELU nonlinearity
+     - spectral_conv: FFT -> keep low modes -> multiply by learned weights -> iFFT
+     - pointwise_linear: a 1x1 conv, the "local" path that also carries high modes
+  |
+  3. Project:   two Linear layers bring width -> out_channels (the prediction)
+  |
+Output u(x,1) prediction, shape (batch, grid, out_channels)
+
+CLASSES
+-------
+1. SpectralConv1d  — the learned Fourier-space multiply (the core piece)
+2. FNO1d           — lift + stacked Fourier layers + project
+
+INPUT CONVENTION
+----------------
+We feed the field plus its x-coordinate as a second channel, so in_channels=2.
+Giving the network the grid coordinate is a small standard trick that helps it.
+"""
+
+import torch
+import torch.nn as nn
+import torch.nn.functional as F
+
+
+class SpectralConv1d(nn.Module):
+    """Learned Fourier-space multiply, keeping the lowest `modes` frequencies.
+
+    FFT the input, keep the lowest `modes` Fourier coefficients, multiply them
+    by learned complex weights, zero the rest, inverse-FFT back.
+
+    
+    """
+    def __init__(self, in_channels, out_channels, modes):
+        super().__init__()
+        self.in_channels = in_channels
+        self.out_channels = out_channels
+        self.modes = modes                       # how many low modes to keep
+
+        # Learned complex weights R, one (in,out) matrix per kept mode.
+        scale = 1.0 / (in_channels * out_channels)
+        self.weight = nn.Parameter(
+            scale * torch.rand(in_channels, out_channels, modes, dtype=torch.cfloat)
+        )
+
+    def forward(self, x):
+        # x: (batch, in_channels, grid)
+        batch, _, grid = x.shape
+
+        # 1. FFT along the spatial axis (real FFT -> nonneg frequencies only).
+        x_ft = torch.fft.rfft(x, dim=-1)          # (batch, in_channels, grid//2 + 1)
+
+        # 2. Prepare an all-zeros output spectrum, then fill only the low modes.
+        out_ft = torch.zeros(batch, self.out_channels, x_ft.size(-1),
+                             dtype=torch.cfloat, device=x.device)
+        m = min(self.modes, x_ft.size(-1))        # guard: don't exceed available modes
+
+        # 3. Multiply the kept low modes by the learned weights R.
+        #    einsum over channels: (batch,in,m) x (in,out,m) -> (batch,out,m)
+        out_ft[:, :, :m] = torch.einsum("bim,iom->bom",
+                                        x_ft[:, :, :m], self.weight[:, :, :m])
+
+        # 4. Inverse FFT back to a field at the original grid size.
+        return torch.fft.irfft(out_ft, n=grid, dim=-1)    
+
+
+class FNO1d(nn.Module):
+    """Full 1D FNO: lift -> [spectral conv + linear skip + GELU] x depth -> project."""
+
+    def __init__(self, modes=16, width=64, depth=4, in_channels=2, out_channels=1):
+        super().__init__()
+        self.width = width
+
+        # Lift: raise input channels to the hidden width.
+        self.fc_in = nn.Linear(in_channels, width)
+
+        # depth Fourier layers, each: spectral conv (global) + 1x1 conv (local).
+        self.spectral = nn.ModuleList([SpectralConv1d(width, width, modes) for _ in range(depth)])
+        self.local    = nn.ModuleList([nn.Conv1d(width, width, 1)          for _ in range(depth)])
+
+        # Project: hidden width -> out_channels.
+        self.fc_out = nn.Sequential(
+            nn.Linear(width, 128), nn.GELU(), nn.Linear(128, out_channels)
+        )
+
+    def forward(self, x):
+        # x: (batch, grid, in_channels)
+        x = self.fc_in(x)              # -> (batch, grid, width)
+        x = x.permute(0, 2, 1)         # -> (batch, width, grid)  [channels-first for the convs]
+
+        for spec, loc in zip(self.spectral, self.local):
+            x = F.gelu(spec(x) + loc(x))   # global path + local path, then nonlinearity
+
+        x = x.permute(0, 2, 1)         # -> (batch, grid, width)  [back to channels-last]
+        return self.fc_out(x)          # -> (batch, grid, out_channels)
