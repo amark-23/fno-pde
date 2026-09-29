@@ -1,4 +1,4 @@
-"""Experiment 1 — Accuracy: FNO vs U-Net at grid 256.
+"""Experiment 1: Accuracy: FNO vs U-Net at grid 256.
 Run:  py experiments/run_accuracy.py"""
 import numpy as np, torch
 import matplotlib; matplotlib.use("Agg"); import matplotlib.pyplot as plt

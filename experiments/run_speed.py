@@ -1,4 +1,4 @@
-"""Experiment 5 — Speed: FNO inference vs the numerical solver, same batch.
+"""Experiment 5: Speed: FNO inference vs the numerical solver, same batch.
 Run:  py experiments/run_speed.py"""
 import time, numpy as np, torch
 from _common import load_split, build_model, device, NPZ

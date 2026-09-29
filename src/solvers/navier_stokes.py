@@ -1,44 +1,41 @@
 """
 2D incompressible Navier-Stokes solver (vorticity-streamfunction form).
 
-PURPOSE
--------
-Generate ground-truth data for the 2D FNO (Part 2). Evolve the vorticity field
-omega(x, y, t) forward in time on a periodic square, saving snapshots along each
-trajectory
+Purpose
+    Generate ground-truth data for the 2D FNO (Part 2). Evolve the vorticity
+    field omega(x, y, t) forward in time on a periodic square, saving snapshots
+    along each trajectory.
 
-THE EQUATION (vorticity transport, periodic domain [0, 2*pi)^2)
+The equation (vorticity transport, periodic domain [0, 2*pi)^2)
 
     d omega/dt + (u . grad) omega = nu * laplacian(omega) + f
 
     omega      scalar vorticity  (omega = dv/dx - du/dy)
-    u = (u,v)  velocity, recovered from omega via the streamfunction
+    u = (u, v) velocity, recovered from omega via the streamfunction
     nu         viscosity
-    f          external forcing (keeps the flow from decaying)
+    f          external forcing that keeps the flow from decaying
 
-Velocity from vorticity (the new mechanism, all in Fourier space):
+Velocity from vorticity, in Fourier space:
     Poisson:   psi_hat = omega_hat / k^2     (streamfunction; k=0 mode set to 0)
-    velocity:  u =  d psi/dy ,  v = - d psi/dx   (multiply by ik)
+    velocity:  u = d psi/dy, v = -d psi/dx   (multiply by ik)
 
-METHOD
-------
-Pseudo-spectral in space (2D FFT for all derivatives, Concept 1), integrating
-factor for the viscous term (Concept 5), 2/3 dealiasing for the nonlinear
-advection (Concept 5). Same toolkit as Burgers, one dimension up.
+Method
+    Pseudo-spectral in space (2D FFT for all derivatives, Concept 1),
+    integrating factor for the viscous term (Concept 5), 2/3 dealiasing for the
+    nonlinear advection (Concept 5). The same toolkit as Burgers, one dimension
+    up.
 
-PLAN -- functions we'll build, in order
----------------------------------------
-1. spectral_grid(N)            2D wavenumbers kx, ky, k^2, and the dealias mask
-2. vorticity_to_velocity(w_hat) solve Poisson, return (u, v)   [the new piece]
-3. rhs(w_hat)                  advection + forcing, in Fourier space
-4. solve_ns(...)              integrating-factor time stepping, save snapshots
-5. (later) generate_dataset() many trajectories -> saved tensor  [runs on Colab GPU]
+Functions, in order
+    1. spectral_grid(N): 2D wavenumbers kx, ky, k^2, and the dealias mask.
+    2. vorticity_to_velocity(w_hat): solve Poisson, return (u, v).
+    3. rhs(w_hat): advection plus forcing, in Fourier space.
+    4. solve_ns(...): integrating-factor time stepping, save snapshots.
+    5. generate_dataset(): many trajectories to a saved tensor (runs on GPU).
 
-DATA SHAPE
-----------
-Each trajectory is a time series of vorticity snapshots, shape (T, N, N). The FNO
-learns to advance one step: given omega at time t (or a short stack of recent
-times), predict omega at t+1, applied autoregressively for a rollout.
+Data shape
+    Each trajectory is a time series of vorticity snapshots, shape (T, N, N).
+    The FNO learns to advance one step: given omega at time t, predict omega at
+    t+1, applied autoregressively for a rollout.
 """
 
 import numpy as np

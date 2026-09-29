@@ -1,27 +1,24 @@
 """
 1D viscous Burgers' equation solver.
 
-PURPOSE
--------
-Generate ground-truth data for the FNO. Given an initial field u(x, 0), compute
-the field u(x, 1) at a later time by simulating the physics.
+Purpose
+    Generate ground-truth data for the FNO. Given an initial field u(x, 0),
+    compute u(x, 1) by simulating the physics.
 
-THE EQUATION (viscous Burgers', periodic domain x in [0, 1))
+The equation (viscous Burgers', periodic domain x in [0, 1))
 
     u_t + u * u_x = nu * u_xx
 
-    u        the field we evolve over time    (a velocity profile)
-    u_t      how u changes in time            (what we step forward)
-    u * u_x  nonlinear advection              (steepens the profile -> shocks)
-    nu * u_xx  viscous diffusion              (smooths out sharp gradients)
-    nu       viscosity: small nu -> sharper shocks, large nu -> smoother
+    u          the evolving field                 (a velocity profile)
+    u_t        rate of change in time             (the stepped quantity)
+    u * u_x    nonlinear advection                (steepens the profile -> shocks)
+    nu * u_xx  viscous diffusion                  (smooths sharp gradients)
+    nu         viscosity: small nu -> sharper shocks, large nu -> smoother
 
-METHOD
-------
-Pseudo-spectral in space: use the FFT to compute the spatial derivatives
-u_x and u_xx (Concept #1 in THEORY.md -> derivative = multiply by ik).
-Then march forward in time in many small steps dt, from t = 0 to t = t_final.
-
+Method
+    Pseudo-spectral in space: the FFT computes the spatial derivatives u_x and
+    u_xx (Concept 1 in THEORY.md, derivative = multiply by ik). The field is
+    then marched forward in time in small steps dt, from t = 0 to t = t_final.
 """
 
 import numpy as np
@@ -30,9 +27,9 @@ import numpy as np
 def gaussian_random_field(n_samples, grid, alpha=2.5, tau=7.0, seed=None):
     """Sample smooth, periodic initial conditions u(x, 0).
 
-    Why random: we want the FNO to learn the mapping for a whole *distribution*
-    of inputs, not one specific initial condition.
-    Why smooth: real fields aren't white noise; we bias toward low frequencies.
+    Randomness lets the FNO learn the mapping for a whole distribution of inputs
+    rather than one initial condition. Smoothness is imposed by biasing the
+    spectrum toward low frequencies.
     """
     # 1. Wavenumbers: which frequencies the grid can represent.
     k = np.fft.fftfreq(grid, d=1.0 / grid)      # -> [0, 1, 2, ..., -2, -1]
@@ -55,8 +52,8 @@ def gaussian_random_field(n_samples, grid, alpha=2.5, tau=7.0, seed=None):
 def solve_burgers(u0, nu=0.01, t_final=1.0, dt=1e-4):
     """March an initial field u0 forward in time to u(x, t_final).
 
-    Uses the FFT for the spatial derivatives (u_x, u_xx). The time-stepping
-    scheme is the open decision above.
+    Uses the FFT for the spatial derivatives (u_x, u_xx) and an explicit Euler
+    step in time.
     """
     n_samples, grid = u0.shape
 
@@ -87,10 +84,10 @@ def solve_burgers_if(u0, nu=0.01, t_final=1.0, dt=1e-3):
     k  = 2 * np.pi * m
     ik = 1j * k
 
-    # NEW #1: the integrating factor — the exact linear (diffusion) solve.
+    # Integrating factor: the exact linear (diffusion) solve.
     E = np.exp(-nu * k**2 * dt)               # always in (0, 1]; never blows up
 
-    # NEW #2: 2/3 dealiasing mask — keep low 2/3 of modes, zero the top third.
+    # 2/3 dealiasing mask: keep low 2/3 of modes, zero the top third.
     dealias = np.abs(m) < grid / 3
 
     def nonlinear_hat(u):
@@ -131,7 +128,7 @@ def generate_dataset(n_train=1000, n_test=200, base_grid=256, nu=0.01,
     """Generate (u0 -> uT) pairs at base_grid, plus downsampled copies.
 
     Returns a dict of arrays keyed by split and resolution, e.g.
-    'u0_train_64', 'uT_test_256' — ready to save with np.savez.
+    'u0_train_64' or 'uT_test_256', ready to save with np.savez.
     """
     n = n_train + n_test
 

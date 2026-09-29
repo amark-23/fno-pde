@@ -1,4 +1,4 @@
-"""Experiment 2 — Resolution transfer: train at grid 64, evaluate at 64/128/256.
+"""Experiment 2: Resolution transfer: train at grid 64, evaluate at 64/128/256.
 The FNO should hold; the U-Net (grid-tied kernels) should degrade.
 Run:  py experiments/run_resolution_transfer.py"""
 import matplotlib; matplotlib.use("Agg"); import matplotlib.pyplot as plt

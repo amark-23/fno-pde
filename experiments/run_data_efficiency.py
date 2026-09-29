@@ -1,4 +1,4 @@
-"""Experiment 3 — Data efficiency: FNO test error vs training-set size.
+"""Experiment 3: Data efficiency: FNO test error vs training-set size.
 Run:  py experiments/run_data_efficiency.py"""
 import matplotlib; matplotlib.use("Agg"); import matplotlib.pyplot as plt
 from _common import train_model, eval_at, FIGDIR, device

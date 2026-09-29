@@ -1,43 +1,35 @@
 """
-Fourier Neural Operator (FNO) — 1D.
+Fourier Neural Operator (FNO), 1D.
 
-PURPOSE
--------
-A neural network that learns the solution operator of Burgers': map an initial field u(x, 0) directly to u(x, 1),
-in one shot, imitating the solver. Trained by backpropagation.
+Purpose
+    A neural network that learns the solution operator of Burgers': it maps an
+    initial field u(x, 0) directly to u(x, 1) in one pass, trained by
+    backpropagation against the solver's output.
 
-THE KEY IDEA 
-----------------------------------
-The solver used the FFT to apply a FIXED operator (multiply by ik) in Fourier
-space. The FNO uses the same FFT hop, but multiplies by LEARNED weights instead.
-That trainable Fourier-space multiply is the "spectral convolution" — the heart
-of the model. Because it acts on frequencies (not grid points), one trained
-model can run at any resolution.
+Core idea
+    The solver applies a fixed operator (multiply by ik) in Fourier space. The
+    FNO uses the same FFT transform but multiplies by learned weights. That
+    trainable Fourier-space multiply is the spectral convolution. Because it
+    acts on frequencies rather than grid points, one trained model runs at any
+    resolution.
 
-ARCHITECTURE 
------------------------------------------
-Input u(x,0), shape (batch, grid, in_channels)
-  |
-  1. Lift:      a Linear layer raises in_channels -> width (a richer hidden dim)
-  |
-  2. Fourier layers x depth: each does
-         spectral_conv(x)  +  pointwise_linear(x)   then a GELU nonlinearity
-     - spectral_conv: FFT -> keep low modes -> multiply by learned weights -> iFFT
-     - pointwise_linear: a 1x1 conv, the "local" path that also carries high modes
-  |
-  3. Project:   two Linear layers bring width -> out_channels (the prediction)
-  |
-Output u(x,1) prediction, shape (batch, grid, out_channels)
+Architecture
+    Input u(x, 0), shape (batch, grid, in_channels).
+    1. Lift: a Linear layer raises in_channels to width.
+    2. Fourier layers, repeated for depth: each computes
+       spectral_conv(x) + pointwise_linear(x), then a GELU. spectral_conv keeps
+       only the low modes; pointwise_linear is a 1x1 conv carrying all
+       frequencies.
+    3. Project: two Linear layers reduce width to out_channels.
+    Output u(x, 1) prediction, shape (batch, grid, out_channels).
 
-CLASSES
--------
-1. SpectralConv1d  — the learned Fourier-space multiply (the core piece)
-2. FNO1d           — lift + stacked Fourier layers + project
+Classes
+    SpectralConv1d: the learned Fourier-space multiply.
+    FNO1d: lift, stacked Fourier layers, project.
 
-INPUT CONVENTION
-----------------
-We feed the field plus its x-coordinate as a second channel, so in_channels=2.
-Giving the network the grid coordinate is a small standard trick that helps it.
+Input convention
+    The field is supplied with its x-coordinate as a second channel, so
+    in_channels = 2. Providing the grid coordinate is a standard aid.
 """
 
 import torch
