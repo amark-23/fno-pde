@@ -64,7 +64,7 @@ size, is highly data-efficient, and runs about 23x faster than the numerical
 solver. Resolution transfer is the structural win: the FNO generalizes across
 resolutions, the U-Net cannot, by construction.
 
-Two honesty notes. The Burgers' setup here is mild (diffusion-dominated), so
+Two things to note: The Burgers' setup here is mild (diffusion-dominated), so
 absolute errors are lower than the original FNO paper's and not directly
 comparable. The U-Net baseline was deliberately strengthened (GroupNorm and
 residual blocks) until it was a genuinely fair comparison; see
