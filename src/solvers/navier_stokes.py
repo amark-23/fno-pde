@@ -98,3 +98,24 @@ def solve_ns(w0, nu=1e-3, t_final=1.0, dt=1e-3, save_every=1, forcing_amp=0.1):
         if (step + 1) % save_every == 0:
             snaps.append(np.fft.ifft2(w_hat).real)
     return np.array(snaps)
+
+def gaussian_random_field_2d(n_samples, N, alpha=2.0, tau=3.0, seed=None):
+    """Smooth random initial vorticity fields, shape (n_samples, N, N)."""
+    rng = np.random.default_rng(seed)
+    k = np.fft.fftfreq(N, d=1.0 / N)
+    kx = k.reshape(N, 1); ky = k.reshape(1, N); k2 = kx**2 + ky**2
+    scale = (k2 + tau**2) ** (-alpha / 2); scale[0, 0] = 0.0
+    noise = rng.standard_normal((n_samples, N, N)) + 1j * rng.standard_normal((n_samples, N, N))
+    w = np.fft.ifft2(noise * scale).real
+    peak = np.abs(w).reshape(n_samples, -1).max(axis=1).reshape(n_samples, 1, 1)
+    return w / peak                                   # normalize each field to amplitude ~1
+
+
+def generate_dataset(n_traj=100, N=64, nu=1e-3, dt=1e-3, t_final=10.0,
+                     n_snapshots=20, seed=0):
+    """Generate NS vorticity trajectories, shape (n_traj, n_snapshots, N, N)."""
+    w0 = gaussian_random_field_2d(n_traj, N, seed=seed)
+    n_steps = int(round(t_final / dt))
+    save_every = max(1, n_steps // n_snapshots)
+    snaps = solve_ns(w0, nu=nu, t_final=t_final, dt=dt, save_every=save_every)  # (n_saved, n_traj, N, N)
+    return np.transpose(snaps, (1, 0, 2, 3)).astype(np.float32)                 # (n_traj, n_saved, N, N)
