@@ -419,3 +419,54 @@ give $\approx 1.0$ (100% error).
 **Config-driven.** All settings (grid, modes, width, depth, epochs, lr, training
 size) live in a YAML config, so the upcoming experiments — baseline comparison,
 resolution transfer, data efficiency — are just different configs, not new code.
+
+---
+
+## 11. Experiment results
+
+All at grid 256 unless noted; relative L2 on 200 test samples; 250 epochs,
+matched protocol (Adam, lr 1e-3 halved every 100). Our dataset is mild
+(diffusion-dominated), so absolute errors are lower than the original paper's
+Burgers setup and not directly comparable.
+
+**1. Accuracy** — FNO **0.34%** (287k params) vs U-Net **1.5%** (429k). The FNO
+is ~4.4x more accurate at comparable size.
+
+**2. Resolution transfer** (train @ 64, evaluate @ 64/128/256) — the headline.
+The FNO's error is **flat: 0.0029 at every resolution**. The U-Net degrades
+catastrophically: 0.010 @ 64 -> 0.37 @ 128 -> 0.48 @ 256. This is *structural*:
+the FNO learns weights on low Fourier modes (same physical frequencies at any
+grid, Concept #8), while the U-Net's convolution kernels are tied to the training
+grid and see features at the wrong scale when the resolution changes.
+
+**3. Data efficiency** — FNO test error vs training size: 100 -> 0.73%,
+250 -> 0.67%, 500 -> 0.29%, 1000 -> 0.34% (the last two differ by run noise).
+Even 100 samples give sub-1% error; the operator is learned from little data.
+
+**4. Speed** (batch of 200) — numerical solver 7.77 ms/sample vs FNO inference
+0.33 ms/sample: **~23x faster**. The learned operator replaces the step-by-step
+simulation with a single forward pass. (Fair-comparison caveats: same hardware,
+CPU, batched; excludes the FNO's one-time training cost.)
+
+**Takeaway.** The FNO matches or beats a strong U-Net on accuracy, is far more
+data-efficient, runs much faster than the solver, and -- uniquely -- transfers
+across resolutions. The resolution-transfer result is the clean, structural win.
+
+## 12. Methodology note — making the baseline fair
+
+The U-Net comparison was not accepted at face value. A first, bare
+conv U-Net underfit badly (~28% *training* error) and looked like "U-Nets can't
+do this." That conclusion was resisted as too cheap, and investigated:
+
+- **Overfit-a-tiny-batch test.** The U-Net *could* fit 16 samples (reached ~4%),
+  proving no bug and no hard representational wall -- the code was sound.
+- **Depth sweep.** Performance only improved once the receptive field became
+  near-global (5 levels), confirming the bottleneck was global information flow,
+  but at a large parameter cost.
+- **The real fix.** Adding **GroupNorm + residual connections** dropped the
+  3-level U-Net from ~28% to ~2.8% -- the earlier failure was an
+  under-engineered (strawman) architecture, not a fundamental limit.
+
+Only then was the comparison run. Lesson: **a negative result is only as strong
+as the effort put into the losing side**; a baseline must be genuinely good
+before its loss means anything.
