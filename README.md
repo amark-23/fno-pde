@@ -1,6 +1,6 @@
 # FNO for PDEs
 
-Learning PDE solution operators with a **Fourier Neural Operator (FNO)** built
+Learning Partial Differential Equation solution operators with a **Fourier Neural Operator (FNO)** built
 from scratch, benchmarked against a strong U-Net baseline and a classical
 numerical solver.
 
@@ -128,19 +128,19 @@ fno-pde/
 ├── THEORY.md                  # theoretical background, concept by concept
 ├── requirements.txt
 ├── src/
-│   ├── solvers/burgers.py            # 1D Burgers solver + dataset
-│   ├── solvers/navier_stokes.py      # 2D NS solver (NumPy reference)
+│   ├── solvers/burgers.py              # 1D Burgers solver + dataset
+│   ├── solvers/navier_stokes.py        # 2D NS solver (NumPy reference)
 │   ├── solvers/navier_stokes_torch.py  # 2D NS solver (PyTorch, GPU)
-│   ├── models/fno.py                 # FNO1d, FNO2d (+ SpectralConv1d/2d)
-│   ├── models/unet.py                # UNet1d, UNet2d (GroupNorm + residual)
-│   ├── data.py, data_ns.py           # 1D and 2D data loaders
-│   ├── train.py                      # config-driven 1D training
-│   ├── metrics.py                    # relative L2 loss
-│   └── experiments_ns.py             # 2D downsample + rollout helpers
-├── configs/                          # burgers_*.yaml
-├── experiments/                      # Part 1 run_*.py + figures/
-├── notebooks/                        # Part 2 Colab notebooks (GPU)
-└── docs/                             # CODE_MAP.md + dev-notes/
+│   ├── models/fno.py                   # FNO1d, FNO2d (+ SpectralConv1d/2d)
+│   ├── models/unet.py                  # UNet1d, UNet2d (GroupNorm + residual)
+│   ├── data.py, data_ns.py             # 1D and 2D data loaders
+│   ├── train.py                        # config-driven 1D training
+│   ├── metrics.py                      # relative L2 loss
+│   └── experiments_ns.py               # 2D downsample + rollout helpers
+├── configs/                            # burgers_*.yaml
+├── experiments/                        # Part 1 run_*.py + figures/
+├── notebooks/                          # Part 2 Colab notebooks (GPU)
+└── docs/                               # CODE_MAP.md + dev-notes/
 ```
 
 ## Reproduce (Part 1)
