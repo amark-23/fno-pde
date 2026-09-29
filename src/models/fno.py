@@ -6,7 +6,7 @@ PURPOSE
 A neural network that learns the solution operator of Burgers': map an initial field u(x, 0) directly to u(x, 1),
 in one shot, imitating the solver. Trained by backpropagation.
 
-THE KEY IDEA (reuses THEORY.md #1)
+THE KEY IDEA 
 ----------------------------------
 The solver used the FFT to apply a FIXED operator (multiply by ik) in Fourier
 space. The FNO uses the same FFT hop, but multiplies by LEARNED weights instead.
@@ -14,7 +14,7 @@ That trainable Fourier-space multiply is the "spectral convolution" — the hear
 of the model. Because it acts on frequencies (not grid points), one trained
 model can run at any resolution.
 
-ARCHITECTURE (what we'll build, in order)
+ARCHITECTURE 
 -----------------------------------------
 Input u(x,0), shape (batch, grid, in_channels)
   |
