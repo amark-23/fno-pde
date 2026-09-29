@@ -2,7 +2,7 @@
 
 Selected figures from the exploratory work behind the project, in the order the
 work happened. They record how the solver was built and verified and how the FNO
-was validated. The working scripts remain in `sandbox/`.
+was validated. Those exploratory scripts have since been removed once their results were promoted here.
 
 ## 1. Initial conditions (Gaussian random field)
 ![GRF samples](figures/grf_samples.png)

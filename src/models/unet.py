@@ -132,4 +132,4 @@ class UNet2d(nn.Module):
         h = self.bottleneck(h)
         for up, dec, skip in zip(self.up, self.dec, reversed(skips)):
             h = dec(torch.cat([up(h), skip], dim=1))
-        return self.head(h).permute(0, 2, 3, 1)       # (B, H, W, out)py sandbox/ns/test_unet2d.py
+        return self.head(h).permute(0, 2, 3, 1)       # (B, H, W, out)

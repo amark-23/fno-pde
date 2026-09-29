@@ -38,3 +38,48 @@ def rollout(model, w0, n_steps, x_norm, y_norm, device="cpu"):
             preds.append(pred)
             w = pred
     return torch.stack(preds, dim=1)                               # (B, n_steps, N, N)
+
+
+def animate_vorticity(true_traj, pred_traj, path, fps=8,
+                      title="rollout: truth vs FNO"):
+    """Animate one vorticity rollout as a 3-panel GIF: truth, prediction, |error|.
+
+    true_traj, pred_traj: arrays or tensors of shape (T, N, N) for a single
+    trajectory (the same T steps in each). Truth and prediction share one
+    diverging color scale so they are directly comparable; the error panel uses
+    its own sequential scale. Writes an animated GIF to `path` and returns it.
+    """
+    import numpy as np
+    import matplotlib.pyplot as plt
+    from matplotlib.animation import FuncAnimation, PillowWriter
+
+    true = np.asarray(true_traj, dtype=float)
+    pred = np.asarray(pred_traj, dtype=float)
+    T = true.shape[0]
+    err = np.abs(pred - true)
+    vmax = float(np.abs(true).max())
+
+    fig, axes = plt.subplots(1, 3, figsize=(9.0, 3.3))
+    panels = [
+        ("truth",   true, dict(cmap="RdBu_r", vmin=-vmax, vmax=vmax)),
+        ("FNO",     pred, dict(cmap="RdBu_r", vmin=-vmax, vmax=vmax)),
+        ("|error|", err,  dict(cmap="magma",  vmin=0.0,   vmax=vmax)),
+    ]
+    ims = []
+    for ax, (name, data, kw) in zip(axes, panels):
+        im = ax.imshow(data[0], origin="lower", **kw)
+        ax.set_title(name); ax.set_xticks([]); ax.set_yticks([])
+        ims.append(im)
+    sup = fig.suptitle(f"{title}    step 1/{T}")
+    fig.tight_layout()
+
+    def update(t):
+        for im, (_, data, _) in zip(ims, panels):
+            im.set_data(data[t])
+        sup.set_text(f"{title}    step {t+1}/{T}")
+        return ims
+
+    anim = FuncAnimation(fig, update, frames=T, blit=False)
+    anim.save(path, writer=PillowWriter(fps=fps))
+    plt.close(fig)
+    return path
