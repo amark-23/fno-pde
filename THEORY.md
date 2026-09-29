@@ -518,3 +518,69 @@ term pseudo-spectrally; add the forcing; and advance in time with the integratin
 factor for the viscous term and the two-thirds dealiasing for the nonlinear
 product. Every piece is either reused from Part 1 or a single Fourier-space
 operation.
+
+---
+
+## 14. Building and verifying the 2D solver
+
+The numerical method reuses the Part 1 toolkit in two dimensions: the FFT for all
+spatial derivatives, the integrating factor for the viscous term, and the
+two-thirds rule for the nonlinear advection product. The only genuinely new step
+is recovering the velocity from the vorticity through the Poisson solve of
+Concept 13.
+
+Forcing is essential. Without a forcing term the viscosity dissipates energy with
+nothing to replace it, so every flow decays toward a motionless rest state
+regardless of its initial condition. The resulting data would be dynamically
+trivial and low in variety. A fixed low-frequency forcing continually injects
+energy, sustaining turbulence so that the vorticity stays rich and the
+step-to-step mapping remains non-trivial over a long rollout. As in Part 1, the
+forcing is the same for every trajectory and the variety between trajectories
+comes from random initial vorticity.
+
+Incompressibility holds exactly by construction. A velocity defined from a
+streamfunction as u = d psi/dy and v = -d psi/dx has divergence
+d u/dx + d v/dy = d^2 psi/dx dy - d^2 psi/dy dx, and the two mixed second
+derivatives are equal, so the divergence is exactly zero for any psi. This is
+confirmed numerically: the divergence of the recovered velocity is at the level
+of machine precision (on the order of 1e-15). The solver also stays bounded and
+produces the expected behavior of two-dimensional turbulence, with coherent
+rotating regions that merge and stretch into filaments over time.
+
+## 15. The 2D spectral convolution and FNO2d
+
+The 2D spectral convolution performs the same transform, multiply, invert
+sequence as its 1D counterpart, but the two spatial axes are treated
+asymmetrically by the real FFT. The real-input symmetry lets the transform store
+only the non-negative frequencies of the last axis, so its low modes form a
+single block. The first axis keeps both signs, so its low modes appear at both
+ends of that axis, near zero for low positive wavenumbers and near the end of the
+array for low negative wavenumbers. The retained low modes therefore occupy two
+blocks, the low-positive and low-negative corners of the first axis at low values
+of the second, and each block is multiplied by its own learned weight tensor.
+
+The full FNO2d has the same structure as FNO1d: a lifting linear layer, a stack of
+Fourier layers that each add a spectral convolution (global, low modes only) and a
+pointwise 1x1 convolution (local, all frequencies) before a nonlinearity, and a
+projecting pair of linear layers. The input carries three channels, the vorticity
+field and two coordinate channels, and the output is the single predicted
+vorticity field. Resolution independence carries over unchanged from the 1D case
+and is confirmed by running one trained set of weights at several grid sizes.
+
+## 16. The 2D learning task and data pipeline
+
+The 2D task is framed as single-step prediction: the model maps the vorticity at
+one time, omega(t), to the vorticity at the next recorded time, omega(t+1), and
+is applied repeatedly to roll a trajectory forward. This differs from the Burgers
+task, which was a single map from an initial field to a final field; here the same
+learned operator is reused at every step, and rollout stability over many steps
+becomes a property worth measuring.
+
+The data pipeline reflects this. Each trajectory is a time series of vorticity
+snapshots. Consecutive snapshots are paired into (omega(t), omega(t+1)) examples,
+the input receives the two coordinate channels, and the vorticity is standardized
+with training statistics. The split into training and test sets is made by whole
+trajectory rather than by pair, so that no snapshot from a test trajectory can
+leak into training. Dataset generation runs through the PyTorch port of the
+solver so that it executes on a GPU, which is what makes a full-scale dataset
+practical.

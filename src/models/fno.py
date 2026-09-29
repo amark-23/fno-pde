@@ -115,3 +115,59 @@ class FNO1d(nn.Module):
 
         x = x.permute(0, 2, 1)         # -> (batch, grid, width)  [back to channels-last]
         return self.fc_out(x)          # -> (batch, grid, out_channels)
+
+
+
+class SpectralConv2d(nn.Module):
+    """2D learned Fourier-space multiply, keeping the lowest (modes1, modes2)."""
+
+    def __init__(self, in_channels, out_channels, modes1, modes2):
+        super().__init__()
+        self.modes1 = modes1
+        self.modes2 = modes2
+        scale = 1.0 / (in_channels * out_channels)
+        # Two weight blocks: low-positive-kx and low-negative-kx corners.
+        self.weight1 = nn.Parameter(
+            scale * torch.rand(in_channels, out_channels, modes1, modes2, dtype=torch.cfloat))
+        self.weight2 = nn.Parameter(
+            scale * torch.rand(in_channels, out_channels, modes1, modes2, dtype=torch.cfloat))
+
+    def forward(self, x):
+        # x: (batch, in_channels, H, W)
+        batch, _, H, W = x.shape
+        x_ft = torch.fft.rfft2(x)                       # (batch, in, H, W//2 + 1)
+
+        out_ft = torch.zeros(batch, self.weight1.shape[1], H, W // 2 + 1,
+                             dtype=torch.cfloat, device=x.device)
+        m1, m2 = self.modes1, self.modes2
+        # top-left corner: low +kx, low ky
+        out_ft[:, :, :m1, :m2] = torch.einsum(
+            "bixy,ioxy->boxy", x_ft[:, :, :m1, :m2], self.weight1)
+        # bottom-left corner: low -kx, low ky
+        out_ft[:, :, -m1:, :m2] = torch.einsum(
+            "bixy,ioxy->boxy", x_ft[:, :, -m1:, :m2], self.weight2)
+
+        return torch.fft.irfft2(out_ft, s=(H, W))       # back to (batch, out, H, W)
+
+
+class FNO2d(nn.Module):
+    """2D FNO: lift -> [spectral conv + 1x1 conv + GELU] x depth -> project."""
+
+    def __init__(self, modes1=12, modes2=12, width=32, depth=4,
+                 in_channels=3, out_channels=1):
+        super().__init__()
+        self.fc_in = nn.Linear(in_channels, width)
+        self.spectral = nn.ModuleList(
+            [SpectralConv2d(width, width, modes1, modes2) for _ in range(depth)])
+        self.local = nn.ModuleList(
+            [nn.Conv2d(width, width, 1) for _ in range(depth)])
+        self.fc_out = nn.Sequential(
+            nn.Linear(width, 128), nn.GELU(), nn.Linear(128, out_channels))
+
+    def forward(self, x):
+        # x: (batch, H, W, in_channels)
+        x = self.fc_in(x).permute(0, 3, 1, 2)          # -> (batch, width, H, W)
+        for spec, loc in zip(self.spectral, self.local):
+            x = F.gelu(spec(x) + loc(x))               # global + local, then nonlinearity
+        x = x.permute(0, 2, 3, 1)                       # -> (batch, H, W, width)
+        return self.fc_out(x)                           # -> (batch, H, W, out_channels)
