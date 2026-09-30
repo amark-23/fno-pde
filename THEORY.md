@@ -27,6 +27,19 @@ the target is y = u(x, 1), the training set is the collection of (input, target)
 pairs the solver produces, the loss is the relative L2 error between prediction
 and the solver's answer, and the optimizer is Adam with backpropagation.
 
+The relationship between the two can be stated precisely. The solver reaches a
+later state by composing many small update steps: its explicit update is
+$u_{n+1} = u_n + \Delta t\, F(u_n)$, with $F$ the right-hand side of the PDE, and
+the field at a recorded time $t + \Delta T$ is the composition of $m = \Delta T /
+\Delta t$ such steps, written $\Phi_{\Delta t}^{\,m}$. That composition is the
+solution operator over the interval, exact up to the time-stepping error but
+costly to evaluate. The FNO replaces it with a single learned operator
+$G_\theta \approx \Phi_{\Delta t}^{\,m}$, fit to the endpoint pairs the solver
+produces and never exposed to the substeps or to $F$, so one forward pass stands
+in for the whole composition. In Burgers the interval is the entire span from
+$t = 0$ to $t = 1$ and the operator is applied once; in Navier-Stokes it is one
+snapshot gap and the operator is applied repeatedly.
+
 What distinguishes this from ordinary regression is that the inputs and outputs
 are whole functions rather than fixed-size feature vectors, a setting known as
 operator learning. Once trained, the network is far faster than the solver and
