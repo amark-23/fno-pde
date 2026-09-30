@@ -73,33 +73,37 @@ class WindowDataset(Dataset):
         return self.traj[i, t:t + self.k + 1]                      # (k+1, N, N)
 
 
-def rollout_loss(model, window, x_norm, y_norm, k, pushforward, noise_std):
+def rollout_loss(model, window, x_norm, y_norm, k, detach, last_only, noise_std):
     """Relative-L2 loss over a k-step rollout starting from window[:, 0].
 
     window: (B, k+1, N, N) raw vorticity. Returns a scalar loss.
+
+    detach:    feed each prediction back with its gradient detached (pushforward,
+               no backpropagation through the rollout). If False, the gradient
+               flows through the whole rollout (full unrolled training).
+    last_only: score only the final step. If False, average the loss over every
+               step, which keeps the single-step objective in the loss while still
+               training on the model's own rolled-out inputs.
     """
     def step(w):
         xf = x_norm.encode(w.unsqueeze(-1))                        # (B, N, N, 1)
         if noise_std > 0:
             xf = xf + noise_std * torch.randn_like(xf)
-        return model(_add_coords(xf))                              # (B, N, N, 1) normalized
+        return model(_add_coords(xf))                             # (B, N, N, 1) normalized
 
     w = window[:, 0]
-    if pushforward and k > 1:
-        with torch.no_grad():                                     # off-distribution input, no BPTT
-            for s in range(1, k):
-                w = y_norm.decode(step(w))[..., 0]
-        pred = step(w)                                            # only the final step carries a gradient
-        target = y_norm.encode(window[:, k].unsqueeze(-1))
-        return relative_l2(pred, target)
-
-    total = 0.0                                                    # full unrolled (k >= 1)
+    total, n = 0.0, 0
     for s in range(1, k + 1):
-        pred = step(w)
-        target = y_norm.encode(window[:, s].unsqueeze(-1))
-        total = total + relative_l2(pred, target)
-        w = y_norm.decode(pred)[..., 0]
-    return total / k
+        if (not last_only) or (s == k):
+            pred = step(w.detach() if detach else w)
+            target = y_norm.encode(window[:, s].unsqueeze(-1))
+            total = total + relative_l2(pred, target)
+            n += 1
+            w = y_norm.decode(pred)[..., 0]
+        else:
+            with torch.no_grad():                                # unscored intermediate step, no graph
+                w = y_norm.decode(step(w))[..., 0]
+    return total / n
 
 
 @torch.no_grad()
@@ -133,6 +137,7 @@ def train_rollout(cfg, device):
     torch.manual_seed(cfg.get("seed", 0))
     k = cfg.get("rollout_steps", 1)
     pushforward = cfg.get("pushforward", False)
+    all_steps = cfg.get("loss_all_steps", False)   # score every rollout step, not just the last
     noise_std = cfg.get("noise_std", 0.0)
 
     train_traj, test_traj, x_norm, y_norm = load_ns_traj(
@@ -151,13 +156,14 @@ def train_rollout(cfg, device):
     t0 = time.time()
     for ep in range(epochs):
         k_ep = 1 if ep < warmup else k
-        pf_ep = pushforward and k_ep > 1
+        detach_ep = pushforward and k_ep > 1
+        last_ep = pushforward and (not all_steps) and k_ep > 1
         model.train()
         tot = nb = 0
         for window in loader:
             window = window.to(device)
             opt.zero_grad()
-            loss = rollout_loss(model, window, x_norm, y_norm, k_ep, pf_ep, noise_std)
+            loss = rollout_loss(model, window, x_norm, y_norm, k_ep, detach_ep, last_ep, noise_std)
             loss.backward()
             opt.step()
             tot += loss.item(); nb += 1
