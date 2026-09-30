@@ -288,6 +288,29 @@ $$(\mathcal{K}v)(x) = \mathcal{F}^{-1}\big(R \cdot \mathcal{F}(v)\big)(x)$$
 
 where $R$ are the learned per-mode weights, a small complex tensor.
 
+This form follows from restricting a general linear operator. The most general
+linear map between functions is an integral operator with a kernel,
+
+$$(\mathcal{K}v)(x) = \int_D \kappa(x, y)\, v(y)\, \mathrm{d}y,$$
+
+in which every output point is a weighted combination of all input points.
+Requiring the operator to be translation invariant, so that the kernel depends
+only on the displacement $\kappa(x, y) = \kappa(x - y)$, reduces the double
+integral to a convolution,
+
+$$(\mathcal{K}v)(x) = \int_D \kappa(x - y)\, v(y)\, \mathrm{d}y = (\kappa * v)(x).$$
+
+The convolution theorem turns that spatial convolution into a pointwise product
+in Fourier space, $\widehat{\kappa * v}(k) = \hat\kappa(k)\,\hat v(k)$, so the
+operator becomes
+
+$$(\mathcal{K}v)(x) = \mathcal{F}^{-1}\big(\hat\kappa \cdot \hat v\big)(x).$$
+
+Writing $R = \hat\kappa$ recovers the layer above. The FNO makes $R$ the learned
+parameter directly, rather than parametrizing $\kappa$ in physical space and
+transforming it. Discretizing with the real FFT, keeping the lowest modes, and
+adding input and output channels turns this into the four-step recipe above.
+
 The learned quantity is not a kernel in physical space. The filter is
 parametrized directly by its Fourier coefficients $R$, a small set of complex
 numbers. The FFT does not discover a kernel; it moves the signal into and out of
@@ -386,6 +409,45 @@ depth, epochs, learning rate, and training size, reside in a YAML configuration
 file, so that the experiments that follow, namely the baseline comparison,
 resolution transfer, and data efficiency, are expressed as different
 configurations rather than new code.
+
+The update rule itself is standard gradient-based optimization. For any trainable
+parameter, gradient descent adjusts it opposite to the gradient of the batch
+loss,
+
+$$\theta \leftarrow \theta - \eta \nabla_\theta L,$$
+
+with learning rate $\eta$. Adam replaces this single step with per-parameter
+adaptive steps built from running averages of the gradient and its square. At
+step $t$, with $g_t = \nabla_\theta L$,
+
+$$m_t = \beta_1 m_{t-1} + (1-\beta_1) g_t, \qquad v_t = \beta_2 v_{t-1} + (1-\beta_2) g_t^2,$$
+
+$$\hat m_t = \frac{m_t}{1-\beta_1^{\,t}}, \qquad \hat v_t = \frac{v_t}{1-\beta_2^{\,t}}, \qquad \theta_t = \theta_{t-1} - \eta \frac{\hat m_t}{\sqrt{\hat v_t} + \varepsilon},$$
+
+with $\beta_1 = 0.9$, $\beta_2 = 0.999$, and $\varepsilon = 10^{-8}$. The
+learning-rate schedule scales $\eta$ down every fixed number of epochs, and the
+weight decay adds a term $\lambda \theta$ to the gradient.
+
+The gradients come from backpropagation through the network. The spectral
+convolution is the one layer specific to the FNO, and its gradient is simple
+because the layer is linear in its weights. On the retained modes the forward
+operation for each mode $k$ is $\hat z_o(k) = \sum_i R_{io}(k)\,\hat x_i(k)$, a
+matrix multiply in Fourier space. Writing $\bar z(k)$ for the gradient of the
+loss arriving at that mode from the inverse transform above it, the gradient
+with respect to the weight is the outer product with the conjugated input,
+
+$$\frac{\partial L}{\partial R_{io}(k)} = \bar z_o(k)\,\overline{\hat x_i(k)}.$$
+
+The conjugate arises because $R$ is complex while the loss is real, so the
+relevant derivative is the Wirtinger derivative $\partial L / \partial \bar R$,
+whose negative is the descent direction for a real objective. Modes above the
+cutoff never enter the sum, so their gradient is zero and they are never updated.
+
+Two points follow. The FFT and the nonlinearity carry no trainable parameters, so
+nothing about the transform is learned; the gradient flows through the FFT because
+it is differentiable, but only the multipliers $R$ and the lift, local, and
+projection weights move. And the solver has no parameters and computes no gradient
+at any point, so backpropagation exists only on the FNO side.
 
 ---
 
@@ -577,3 +639,40 @@ trajectory rather than by pair, so that no snapshot from a test trajectory can
 leak into training. Dataset generation runs through the PyTorch port of the
 solver so that it executes on a GPU, which is what makes a full-scale dataset
 practical.
+
+---
+
+## 17. Autoregressive rollout and error growth
+
+The 2D model predicts one step, so a full trajectory is produced by feeding each
+prediction back in as the next input. This autoregressive use makes rollout
+stability a property in its own right, separate from single-step accuracy, and it
+explains why the error grows toward the end of a long rollout.
+
+Three effects compound. The first is error feedback. After the first step the
+model never sees the true vorticity again; it acts on its own previous output, so
+an error made early is carried forward and reprocessed at every later step rather
+than staying fixed. The second is a mismatch between training and inference. The
+model is trained on pairs of true fields, so its input at training time is always
+an exact, on-distribution vorticity field, whereas from the second step of a
+rollout onward its input is a slightly wrong field it was never trained on. Each
+step drifts a little further from the distribution the network learned, and the
+predictions degrade faster than the single-step test error alone would suggest.
+The third is the physics. Two-dimensional turbulence has sensitive dependence on
+initial conditions, so a small perturbation introduced at one step is stretched
+and amplified by the dynamics rather than damped.
+
+These effects concentrate where the flow is hardest to represent. The error is
+not uniform noise but is organized along the sharp, filament-shaped vorticity
+gradients, which are the fast-evolving high-frequency features. Those are exactly
+the frequencies the spectral path discards, since it keeps only the lowest modes,
+so the model is least accurate where the dynamics are most demanding.
+
+This is the counterpart to the single-step accuracy result. A U-Net predicts one
+step more accurately, but its error compounds faster under rollout, while the FNO,
+with its smoother spectral bias, stays stable longer and overtakes the U-Net after
+a few steps. For an operator meant to be iterated, the property worth reporting is
+therefore the rollout behavior rather than the single-step number alone. It also
+motivates rollout-aware training, in which the model is unrolled for several steps
+during training, or trained with noise added to its inputs, so that it learns to
+correct its own errors.
