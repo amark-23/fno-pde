@@ -11,7 +11,7 @@ one idea, in the order the code introduces it.
 The project involves two distinct systems, both built on the FFT: a numerical
 solver and the FNO.
 
-The first is the solver: classical physics, with no machine learning. It computes
+The first is the solver: (no machine learning) It computes
 the true final field u(x, 1) from an initial field u(x, 0) by marching forward
 through many small time steps, using the FFT at each step to compute spatial
 derivatives. It acts as the teacher, generating ground-truth data.
