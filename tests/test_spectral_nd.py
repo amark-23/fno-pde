@@ -11,7 +11,7 @@ import torch
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from src.models.fno import SpectralConv1d, SpectralConv2d
-from src.models.fno_nd import SpectralConvNd
+from src.models.fno_nd import SpectralConvNd, FNONd
 
 
 def test_matches_1d():
@@ -51,8 +51,23 @@ def test_runs_3d():
     return tuple(y.shape)
 
 
+def test_fno_nd_runs():
+    shapes = {}
+    for modes, spatial in [((8,), (64,)), ((6, 8), (32, 40)), ((4, 4, 4), (8, 8, 8))]:
+        d = len(modes)
+        model = FNONd(modes=modes, width=16, depth=2)     # in_channels = 1 + d
+        x = torch.randn(2, *spatial, 1 + d, requires_grad=True)
+        y = model(x)
+        assert y.shape == (2, *spatial, 1), f"{d}D shape {tuple(y.shape)}"
+        y.sum().backward()
+        assert x.grad is not None
+        shapes[d] = tuple(y.shape)
+    return shapes
+
+
 if __name__ == "__main__":
     e1 = test_matches_1d(); print(f"1D equivalence: rel-L2 {e1:.2e}  OK")
     e2 = test_matches_2d(); print(f"2D equivalence: rel-L2 {e2:.2e}  OK")
     s3 = test_runs_3d();    print(f"3D forward+backward: output {s3}  OK")
+    sh = test_fno_nd_runs();  print(f"FNONd 1D/2D/3D forward+backward: {sh}  OK")
     print("all passed")

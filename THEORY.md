@@ -689,3 +689,31 @@ therefore the rollout behavior rather than the single-step number alone. It also
 motivates rollout-aware training, in which the model is unrolled for several steps
 during training, or trained with noise added to its inputs, so that it learns to
 correct its own errors.
+
+---
+
+## 18. The n-dimensional spectral convolution
+
+The 1D and 2D spectral convolutions differ only in bookkeeping, so a single layer
+covers any number of dimensions. The transform, the low-mode multiply, and the
+inverse transform are the same in every dimension; what changes is which
+coefficients count as low modes. The real FFT stores only the non-negative
+frequencies of its last axis, so that axis contributes a single low block. Each of
+the other $d-1$ axes keeps both signs, so its low modes appear at both ends of the
+axis. Selecting the low block at each end of those axes gives $2^{d-1}$ corner
+blocks: one in 1D, two in 2D, four in 3D. Each corner carries its own weight
+tensor, and the per-mode multiply is a channel contraction whose index pattern is
+built from $d$ spatial labels. The 1D layer with one block and the 2D layer with
+two are exactly the cases $d = 1$ and $d = 2$.
+
+Writing the layer this way, as SpectralConvNd, makes the generalization explicit
+and testable. Given the same weights, it reproduces the fixed-dimension
+SpectralConv1d and SpectralConv2d to floating-point precision, which confirms that
+the general indexing performs the same computation as the hand-written versions
+rather than a near-approximation. The surrounding network is already
+dimension-free once the local path is written as a channel-wise linear layer
+instead of a fixed-dimension convolution, so a single FNONd runs in one, two, or
+three dimensions without further change. This establishes the n-dimensional form
+of the method at the level of the operator, separate from whether a
+three-dimensional dataset is worth generating, which carries a much larger compute
+and storage cost.

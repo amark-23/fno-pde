@@ -17,6 +17,7 @@ import itertools
 
 import torch
 import torch.nn as nn
+import torch.nn.functional as F
 
 
 class SpectralConvNd(nn.Module):
@@ -73,3 +74,47 @@ class SpectralConvNd(nn.Module):
             out_ft[block] = torch.einsum(eq, x_ft[block], self.weight[idx])
 
         return torch.fft.irfftn(out_ft, s=spatial, dim=dims)
+
+
+
+class FNONd(nn.Module):
+    """Dimension-general FNO: lift, a stack of Fourier layers, then project.
+
+    modes is a sequence of length d. Each Fourier layer adds a SpectralConvNd
+    (global, low modes) and a pointwise Linear over channels (local, all
+    frequencies), then applies a GELU. The local path is a channel-wise Linear
+    rather than a fixed-dimension convolution, which is dimension-free and plays
+    the role of the 1x1 conv in FNO1d and FNO2d. By default in_channels is the
+    field plus one coordinate channel per axis.
+    """
+
+    def __init__(self, modes, width=32, depth=4, in_channels=None, out_channels=1):
+        super().__init__()
+        self.modes = tuple(modes)
+        self.d = len(self.modes)
+        if in_channels is None:
+            in_channels = 1 + self.d
+        self.fc_in = nn.Linear(in_channels, width)
+        self.spectral = nn.ModuleList(
+            [SpectralConvNd(width, width, self.modes) for _ in range(depth)])
+        self.local = nn.ModuleList(
+            [nn.Linear(width, width) for _ in range(depth)])
+        self.fc_out = nn.Sequential(
+            nn.Linear(width, 128), nn.GELU(), nn.Linear(128, out_channels))
+
+    def _to_first(self):
+        # (batch, *spatial, C) -> (batch, C, *spatial)
+        return (0, self.d + 1) + tuple(range(1, self.d + 1))
+
+    def _to_last(self):
+        # (batch, C, *spatial) -> (batch, *spatial, C)
+        return (0,) + tuple(range(2, self.d + 2)) + (1,)
+
+    def forward(self, x):
+        # x: (batch, *spatial, in_channels) with d spatial axes
+        x = self.fc_in(x)                                  # channels last
+        first, last = self._to_first(), self._to_last()
+        for spec, loc in zip(self.spectral, self.local):
+            s = spec(x.permute(*first).contiguous()).permute(*last).contiguous()
+            x = F.gelu(s + loc(x))                         # global + local, then nonlinearity
+        return self.fc_out(x)

@@ -132,6 +132,7 @@ fno-pde/
 │   ├── solvers/navier_stokes.py        # 2D NS solver (NumPy reference)
 │   ├── solvers/navier_stokes_torch.py  # 2D NS solver (PyTorch, GPU)
 │   ├── models/fno.py                   # FNO1d, FNO2d (+ SpectralConv1d/2d)
+│   ├── models/fno_nd.py                # SpectralConvNd, FNONd (any dimension)
 │   ├── models/unet.py                  # UNet1d, UNet2d (GroupNorm + residual)
 │   ├── data.py, data_ns.py             # 1D and 2D data loaders
 │   ├── train.py                        # config-driven 1D training
@@ -140,8 +141,12 @@ fno-pde/
 ├── configs/                            # burgers_*.yaml
 ├── experiments/                        # Part 1 run_*.py + figures/
 ├── notebooks/                          # Part 2 Colab notebooks (GPU)
+├── tests/                              # SpectralConvNd equivalence tests
 └── docs/                               # CODE_MAP.md + dev-notes/
 ```
+
+The spectral convolution is also written in a dimension-general form (`SpectralConvNd` and `FNONd` in `src/models/fno_nd.py`), verified bit-exact against the 1D and 2D layers by `tests/test_spectral_nd.py`. See THEORY.md, Concept 18.
+
 
 ## Reproduce (Part 1)
 
