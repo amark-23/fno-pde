@@ -78,3 +78,12 @@ single-step map the FNO learns. Regenerate with `python experiments/run_animatio
 
 The trained FNO rolled out autoregressively for 19 steps against the true
 vorticity and the pointwise error. Produced by section 6b of the training notebook.
+
+## 14. 2D rollout stabilization
+![Rollout stabilization](figures/rollout_stability.png)
+
+Rollout error at each step for four training schemes. Noise injection (end 0.160)
+and all-step unrolled training (0.164) both beat the single-step baseline (0.170)
+at negligible accuracy cost; last-step-only unrolling (0.190) is worse, since it
+degrades the single-step map every later step depends on. Produced by
+`notebooks/navier_stokes_rollout_colab.ipynb`.

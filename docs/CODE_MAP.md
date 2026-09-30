@@ -95,3 +95,14 @@ The spectral convolution and FNO written for any number of spatial dimensions.
 ## tests/
 - `test_spectral_nd.py` checks `SpectralConvNd` against `SpectralConv1d` and
   `SpectralConv2d`, and runs `FNONd` forward and backward in 1D, 2D, and 3D.
+
+## src/train_ns.py (rollout stabilization)
+Config-driven training that reduces autoregressive rollout error.
+- `WindowDataset` yields consecutive trajectory windows for unrolled training.
+- `rollout_loss` covers the schemes via two flags: `detach` (pushforward feedback
+  vs backpropagation through the rollout) and `last_only` (score the last step vs
+  every step), plus `noise_std` for noise injection.
+- `train_rollout` runs it with a `warmup_epochs` schedule (single-step first, then
+  unroll); `save_checkpoint` / `load_checkpoint` persist the model and normalizers.
+- Configs: `ns_baseline`, `ns_noise`, `ns_pushforward`, `ns_pushforward_all`.
+- Notebook: `notebooks/navier_stokes_rollout_colab.ipynb`.

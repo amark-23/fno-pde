@@ -690,6 +690,27 @@ motivates rollout-aware training, in which the model is unrolled for several ste
 during training, or trained with noise added to its inputs, so that it learns to
 correct its own errors.
 
+These schemes were tested on the same data, comparing single-step accuracy against
+the rollout error at step 19. Four models were trained: a single-step baseline,
+noise injection, and two unrolled schemes that feed the model its own predictions
+during training, one scoring only the final step and one scoring every step.
+
+| scheme | single-step | rollout (step 19) |
+| --- | --- | --- |
+| baseline | 0.109 | 0.170 |
+| noise injection | 0.109 | 0.160 |
+| unrolled, all steps | 0.111 | 0.164 |
+| unrolled, last step only | 0.152 | 0.190 |
+
+Two things follow. Noise injection lowered the rollout error at no cost to
+single-step accuracy, the simplest and most effective change here. Unrolled
+training helped only when it kept the single-step objective: scoring every step
+recovered baseline accuracy and improved the rollout, while scoring only the final
+step degraded both, because it stopped optimizing the one-step map that every later
+step depends on. The gains are modest overall because the baseline is already
+fairly stable on this problem, consistent with the earlier finding that the FNO
+does not diverge under rollout the way the U-Net does.
+
 ---
 
 ## 18. The n-dimensional spectral convolution

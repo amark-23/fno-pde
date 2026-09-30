@@ -124,6 +124,32 @@ rollout stability the table reports.
 
 
 
+## Part 2b: rollout stabilization
+
+Autoregressive rollout error grows because the model is fed its own imperfect
+predictions (see [THEORY.md, Concept 17](THEORY.md)). Three training schemes were
+compared against the single-step baseline: noise injection, and unrolled training
+scoring either only the last step or every step.
+
+| scheme | single-step | rollout (step 19) |
+| --- | --- | --- |
+| baseline | 0.109 | 0.170 |
+| noise injection | **0.109** | **0.160** |
+| unrolled, all steps | 0.111 | 0.164 |
+| unrolled, last step only | 0.152 | 0.190 |
+
+![Rollout stabilization](docs/dev-notes/figures/rollout_stability.png)
+
+*Rollout error growth by training scheme.*
+
+**Finding.** Noise injection and all-step unrolled training both push the rollout
+error below baseline, with noise the cheapest. Last-step-only unrolling backfires:
+it sacrifices the single-step accuracy that every later rollout step depends on, so
+both numbers get worse. The gains are modest because the baseline FNO is already
+fairly stable on this problem. Reproduce on Colab with
+`notebooks/navier_stokes_rollout_colab.ipynb` (configs `ns_baseline`, `ns_noise`,
+`ns_pushforward`, `ns_pushforward_all`).
+
 ## Repo layout
 
 ```
