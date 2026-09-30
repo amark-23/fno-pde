@@ -1,0 +1,18 @@
+# Noise injection: single-step, with Gaussian noise added to the input each step.
+model: fno
+data: data/navier_stokes.npz
+n_train_traj: 800
+n_test_traj: 200
+modes1: 12
+modes2: 12
+width: 32
+depth: 4
+epochs: 50
+batch_size: 32
+lr: 1.0e-3
+weight_decay: 1.0e-4
+seed: 0
+rollout_steps: 1
+pushforward: false
+noise_std: 0.02
+eval_rollout_steps: 19
