@@ -82,3 +82,16 @@ for the 2D experiments.
 - `src/models/fno.py` also defines `SpectralConv2d` and `FNO2d`.
 - `src/models/unet.py` also defines `ResBlock2d` and `UNet2d`.
 - `notebooks/` holds the Colab notebooks for GPU generation and training.
+
+
+## src/models/fno_nd.py (dimension-general)
+The spectral convolution and FNO written for any number of spatial dimensions.
+- `SpectralConvNd` generalizes `SpectralConv1d` and `SpectralConv2d`: it uses
+  2**(d-1) corner blocks and an einsum built from d spatial labels, and is
+  bit-exact to the fixed-dimension layers when given the same weights.
+- `FNONd` wraps it with a channel-wise linear local path in place of a
+  fixed-dimension convolution, so one class runs in 1D, 2D, or 3D.
+
+## tests/
+- `test_spectral_nd.py` checks `SpectralConvNd` against `SpectralConv1d` and
+  `SpectralConv2d`, and runs `FNONd` forward and backward in 1D, 2D, and 3D.
