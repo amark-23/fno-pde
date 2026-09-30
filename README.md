@@ -120,6 +120,10 @@ rollout stability the table reports.
 
 *Truth, FNO prediction, and |error| across the 19-step rollout.*
 
+**n-dimensional generalization.** The spectral convolution is implemented in a dimension-general form (`SpectralConvNd`, with an `FNONd` wrapper, in `src/models/fno_nd.py`), verified bit-exact against the 1D and 2D cases by `tests/test_spectral_nd.py` and shown to run a forward and backward pass in 3D. Training in 3D is left as future work, as it is primarily a matter of data generation and compute cost rather than method. See THEORY.md, Concept 18.
+
+
+
 ## Repo layout
 
 ```
@@ -144,8 +148,6 @@ fno-pde/
 ├── tests/                              # SpectralConvNd equivalence tests
 └── docs/                               # CODE_MAP.md + dev-notes/
 ```
-
-**n-dimensional generalization.** The spectral convolution is implemented in a dimension-general form (`SpectralConvNd`, with an `FNONd` wrapper, in `src/models/fno_nd.py`), verified bit-exact against the 1D and 2D cases by `tests/test_spectral_nd.py` and shown to run a forward and backward pass in 3D. Training in 3D is left as future work, as it is primarily a matter of data generation and compute cost rather than method. See THEORY.md, Concept 18.
 
 
 ## Reproduce (Part 1)
