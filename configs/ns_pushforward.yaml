@@ -13,6 +13,7 @@ lr: 1.0e-3
 weight_decay: 1.0e-4
 seed: 0
 rollout_steps: 4
+warmup_epochs: 30        # train single-step first, then unroll
 pushforward: true
 noise_std: 0.0
 eval_rollout_steps: 19

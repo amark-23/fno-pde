@@ -147,26 +147,57 @@ def train_rollout(cfg, device):
     epochs = cfg.get("epochs", 50)
     sched = torch.optim.lr_scheduler.StepLR(opt, step_size=max(1, epochs // 2), gamma=0.5)
 
+    warmup = cfg.get("warmup_epochs", 0)                       # single-step epochs before unrolling
     t0 = time.time()
     for ep in range(epochs):
+        k_ep = 1 if ep < warmup else k
+        pf_ep = pushforward and k_ep > 1
         model.train()
         tot = nb = 0
         for window in loader:
             window = window.to(device)
             opt.zero_grad()
-            loss = rollout_loss(model, window, x_norm, y_norm, k, pushforward, noise_std)
+            loss = rollout_loss(model, window, x_norm, y_norm, k_ep, pf_ep, noise_std)
             loss.backward()
             opt.step()
             tot += loss.item(); nb += 1
         sched.step()
         if (ep + 1) % max(1, epochs // 10) == 0:
-            print(f"  epoch {ep+1}/{epochs}  train loss {tot/nb:.4f}")
+            tag = "warmup k=1" if ep < warmup else f"k={k}"
+            print(f"  epoch {ep+1}/{epochs} [{tag}]  train loss {tot/nb:.4f}")
 
     curve = eval_rollout_error(model, test_traj, x_norm, y_norm,
                                cfg.get("eval_rollout_steps", 19), device)
     print(f"  single-step test rel-L2 {curve[0]:.4f} | "
           f"rollout end {curve[-1]:.4f} | {time.time()-t0:.0f}s")
-    return model, {"single_step": curve[0], "rollout_curve": curve}
+    return model, {"single_step": curve[0], "rollout_curve": curve,
+                   "x_norm": x_norm, "y_norm": y_norm}
+
+
+def save_checkpoint(model, cfg, x_norm, y_norm, path):
+    """Save model weights, architecture, and normalizer stats to `path`."""
+    torch.save({
+        "model": model.state_dict(),
+        "arch": {"model": cfg["model"],
+                 "modes1": cfg.get("modes1", 12), "modes2": cfg.get("modes2", 12),
+                 "width": cfg.get("width", 32), "depth": cfg.get("depth", 4),
+                 "n_levels": cfg.get("n_levels", 3)},
+        "x_mean": x_norm.mean.cpu(), "x_std": x_norm.std.cpu(),
+        "y_mean": y_norm.mean.cpu(), "y_std": y_norm.std.cpu(),
+    }, path)
+
+
+def load_checkpoint(path, device):
+    """Rebuild a model and its normalizers from a checkpoint saved by save_checkpoint."""
+    ck = torch.load(path, map_location=device)
+    model = build_model(ck["arch"]).to(device)
+    model.load_state_dict(ck["model"])
+    model.eval()
+    x_norm = Normalizer.__new__(Normalizer)
+    x_norm.mean, x_norm.std = ck["x_mean"].to(device), ck["x_std"].to(device)
+    y_norm = Normalizer.__new__(Normalizer)
+    y_norm.mean, y_norm.std = ck["y_mean"].to(device), ck["y_std"].to(device)
+    return model, x_norm, y_norm
 
 
 def main():
