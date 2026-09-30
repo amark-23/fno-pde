@@ -676,3 +676,46 @@ therefore the rollout behavior rather than the single-step number alone. It also
 motivates rollout-aware training, in which the model is unrolled for several steps
 during training, or trained with noise added to its inputs, so that it learns to
 correct its own errors.
+
+---
+
+## 18. From the time-stepping update to a learned operator
+
+The solver advances the field by a local update rule. In the explicit form this
+is
+
+$$u_{n+1} = u_n + \Delta t\, F(u_n),$$
+
+with $F$ the right-hand side of the PDE (Concept 4), and in the
+integrating-factor form the stiff linear part is applied exactly (Concept 5).
+Either way, one application advances the field by a single small step $\Delta t$.
+The field at a later, recorded time is reached by composing many such steps.
+Writing $\Phi_{\Delta t}$ for one update, the map from one saved state to the next
+is
+
+$$u(t + \Delta T) = \big(\Phi_{\Delta t} \circ \cdots \circ \Phi_{\Delta t}\big)\big(u(t)\big) = \Phi_{\Delta t}^{\,m}\big(u(t)\big), \qquad m = \Delta T / \Delta t.$$
+
+This composed map is the solution operator over the output interval $\Delta T$. It
+is exact up to the time-stepping error, but it is expensive, since evaluating it
+means running all $m$ substeps.
+
+The FNO is derived by replacing that composition with a single learned operator.
+Rather than reproduce the intermediate substeps, it defines a parametric map
+$G_\theta$ and fits it to the input-output pairs the solver produces,
+
+$$G_\theta \approx \Phi_{\Delta t}^{\,m},$$
+
+so that one forward pass of $G_\theta$ approximates the whole composition. The
+network never sees the substeps or the right-hand side $F$; it sees only the
+endpoints $\big(u(t),\, u(t + \Delta T)\big)$ and learns the map between them. This
+is the source of the speedup: the learned operator collapses $m$ numerical
+substeps into one evaluation.
+
+The two parts of the project instantiate this at different scales. In Burgers the
+output interval is the whole span from $t = 0$ to $t = 1$, so $G_\theta$ learns a
+single map from the initial field to the final field and is applied once. In
+Navier-Stokes the output interval is one snapshot gap, so $G_\theta$ learns the
+one-step map $\omega(t) \to \omega(t+1)$ and is applied repeatedly, which is the
+autoregressive rollout of Concept 17. In both cases the learned operator stands in
+for a composition of numerical update steps, and the only difference is how large
+an interval each application spans.
